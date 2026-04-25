@@ -28,7 +28,8 @@
   const state = {
     config: null,
     student: null,        // { nie, name, grade }
-    partner: null,        // { nie, name, grade } | null
+    partner: null,        // { nie, name, grade } | null  (compatibilidad: primer compañero)
+    partners: [],         // array de hasta 4 compañeros
     poolVersion: null,    // 'A' | 'B'
     answers: {},          // { exerciseId: { score, total, details } }
     extraPoints: 0,       // del juego final
@@ -145,6 +146,7 @@
       const snapshot = {
         student: state.student,
         partner: state.partner,
+        partners: state.partners,
         poolVersion: state.poolVersion,
         answers: state.answers,
         extraPoints: state.extraPoints
@@ -211,10 +213,25 @@
   // =====================================================================
   function showLoginModal() {
     return new Promise((resolve) => {
-      // Llamar welcome de Rigo apenas exista
+      const MAX_PARTNERS = 4;
+
+      // Llamar welcome de Rigo apenas exista y posicionarlo en esquina del modal
       const tryWelcome = () => {
         if (global.rigo && typeof global.rigo.welcome === 'function') {
           global.rigo.welcome();
+          // Mover Rigo a la esquina superior izquierda mientras está el login
+          try {
+            const rigoEl = global.rigo;
+            rigoEl.dataset.savedTop = rigoEl.style.top || '';
+            rigoEl.dataset.savedLeft = rigoEl.style.left || '';
+            rigoEl.dataset.savedRight = rigoEl.style.right || '';
+            rigoEl.dataset.savedBottom = rigoEl.style.bottom || '';
+            rigoEl.style.top = '20px';
+            rigoEl.style.left = '20px';
+            rigoEl.style.right = 'auto';
+            rigoEl.style.bottom = 'auto';
+            rigoEl.style.zIndex = '10000';
+          } catch (e) {}
         } else {
           setTimeout(tryWelcome, 200);
         }
@@ -225,28 +242,31 @@
       overlay.className = 'coeduca-login-overlay';
       overlay.innerHTML = `
         <div class="coeduca-login-modal">
-          <h2>Bienvenido</h2>
-          <p>Ingresa tu NIE para comenzar</p>
-
-          <div class="coeduca-login-field">
-            <label>NIE del estudiante</label>
-            <input type="text" id="coeduca-nie-input" class="coeduca-input coeduca-input-allow-copy"
-                   inputmode="numeric" autocomplete="off" placeholder="Ej. 12379">
-            <div class="coeduca-login-info" id="coeduca-nie-info"></div>
-            <div class="coeduca-login-error" id="coeduca-nie-error">NIE no encontrado</div>
+          <div class="coeduca-login-header">
+            <div class="coeduca-login-badge">COEDUCA</div>
+            <h2>BIENVENIDO</h2>
+            <p>Ingresa tu NIE para comenzar</p>
           </div>
 
-          <div class="coeduca-login-field coeduca-hidden" id="coeduca-partner-wrap">
-            <label>NIE del compañero (opcional)</label>
-            <input type="text" id="coeduca-partner-input" class="coeduca-input coeduca-input-allow-copy"
-                   inputmode="numeric" autocomplete="off" placeholder="NIE del compañero">
-            <div class="coeduca-login-info" id="coeduca-partner-info"></div>
-            <div class="coeduca-login-error" id="coeduca-partner-error">NIE no encontrado</div>
+          <div class="coeduca-login-modal-scroll">
+            <div class="coeduca-login-field" data-role="main">
+              <label><span class="coeduca-login-icon">1</span> NIE del estudiante</label>
+              <input type="text" id="coeduca-nie-input" class="coeduca-input coeduca-input-allow-copy"
+                     inputmode="numeric" autocomplete="off" placeholder="Ej. 12379">
+              <div class="coeduca-login-info" id="coeduca-nie-info"></div>
+              <div class="coeduca-login-error" id="coeduca-nie-error">NIE no encontrado</div>
+            </div>
+
+            <div id="coeduca-partners-list"></div>
           </div>
 
           <div class="coeduca-login-actions">
-            <button class="coeduca-btn coeduca-btn-info" id="coeduca-add-partner-btn">+ Compañero</button>
-            <button class="coeduca-btn coeduca-btn-success" id="coeduca-login-submit" disabled>Comenzar</button>
+            <button class="coeduca-btn coeduca-btn-info" id="coeduca-add-partner-btn" type="button">
+              + Compañero <span id="coeduca-partner-counter" style="font-size:11px;opacity:0.85;"></span>
+            </button>
+            <button class="coeduca-btn coeduca-btn-success" id="coeduca-login-submit" disabled type="button">
+              Comenzar
+            </button>
           </div>
         </div>
       `;
@@ -255,27 +275,39 @@
       const nieInput = overlay.querySelector('#coeduca-nie-input');
       const nieInfo = overlay.querySelector('#coeduca-nie-info');
       const nieError = overlay.querySelector('#coeduca-nie-error');
-      const partnerWrap = overlay.querySelector('#coeduca-partner-wrap');
-      const partnerInput = overlay.querySelector('#coeduca-partner-input');
-      const partnerInfo = overlay.querySelector('#coeduca-partner-info');
-      const partnerError = overlay.querySelector('#coeduca-partner-error');
+      const partnersList = overlay.querySelector('#coeduca-partners-list');
       const addPartnerBtn = overlay.querySelector('#coeduca-add-partner-btn');
+      const partnerCounter = overlay.querySelector('#coeduca-partner-counter');
       const submitBtn = overlay.querySelector('#coeduca-login-submit');
 
       let mainStudent = null;
-      let partnerStudent = null;
+      const partners = []; // [{ student, fieldEl, inputEl }]
 
       function lookupNIE(nie) {
-        const STUDENTS = global.STUDENTS || {};
+        // STUDENTS puede estar como global (var) o lexical (const/let).
+        let DB = null;
+        try { DB = global.STUDENTS; } catch (e) {}
+        if (!DB) { try { DB = STUDENTS; } catch (e) {} }
+        if (!DB) return null;
         const clean = String(nie || '').trim();
-        return clean && STUDENTS[clean] ? { nie: clean, ...STUDENTS[clean] } : null;
+        return clean && DB[clean] ? { nie: clean, ...DB[clean] } : null;
+      }
+
+      function updateCounter() {
+        if (partners.length === 0) {
+          partnerCounter.textContent = '';
+        } else {
+          partnerCounter.textContent = '(' + partners.length + '/' + MAX_PARTNERS + ')';
+        }
+        addPartnerBtn.disabled = partners.length >= MAX_PARTNERS;
+        addPartnerBtn.style.opacity = partners.length >= MAX_PARTNERS ? '0.5' : '1';
       }
 
       function validateMain() {
         const found = lookupNIE(nieInput.value);
         if (found) {
           mainStudent = found;
-          nieInfo.textContent = found.name + ' - ' + found.grade;
+          nieInfo.innerHTML = '<b>' + escapeHTML(found.name) + '</b><br><small>' + escapeHTML(found.grade) + '</small>';
           nieInfo.classList.add('show');
           nieError.classList.remove('show');
           if (global.rigo && global.rigo.setGrade) global.rigo.setGrade(found.grade);
@@ -283,51 +315,152 @@
         } else {
           mainStudent = null;
           nieInfo.classList.remove('show');
-          if (nieInput.value.length >= 4) nieError.classList.add('show');
+          if (nieInput.value.trim().length >= 4) nieError.classList.add('show');
           else nieError.classList.remove('show');
           submitBtn.disabled = true;
         }
       }
 
-      function validatePartner() {
-        if (!partnerInput.value.trim()) {
-          partnerStudent = null;
-          partnerInfo.classList.remove('show');
-          partnerError.classList.remove('show');
-          return;
-        }
-        const found = lookupNIE(partnerInput.value);
-        if (found) {
-          partnerStudent = found;
-          partnerInfo.textContent = found.name + ' - ' + found.grade;
-          partnerInfo.classList.add('show');
-          partnerError.classList.remove('show');
-        } else {
-          partnerStudent = null;
-          partnerInfo.classList.remove('show');
-          if (partnerInput.value.length >= 4) partnerError.classList.add('show');
-        }
+      function addPartnerField() {
+        if (partners.length >= MAX_PARTNERS) return;
+        const slot = { student: null };
+        const num = partners.length + 2; // 2,3,4,5
+        const field = document.createElement('div');
+        field.className = 'coeduca-login-field coeduca-login-field-partner';
+        field.innerHTML = `
+          <label>
+            <span class="coeduca-login-icon">${num}</span>
+            NIE del compañero ${num - 1}
+            <button type="button" class="coeduca-login-remove" title="Quitar">×</button>
+          </label>
+          <input type="text" class="coeduca-input coeduca-input-allow-copy coeduca-partner-input"
+                 inputmode="numeric" autocomplete="off" placeholder="NIE del compañero">
+          <div class="coeduca-login-info"></div>
+          <div class="coeduca-login-error">NIE no encontrado</div>
+        `;
+        partnersList.appendChild(field);
+
+        const inp = field.querySelector('input');
+        const info = field.querySelector('.coeduca-login-info');
+        const err = field.querySelector('.coeduca-login-error');
+        const removeBtn = field.querySelector('.coeduca-login-remove');
+
+        slot.fieldEl = field;
+        slot.inputEl = inp;
+
+        const validate = () => {
+          const v = inp.value.trim();
+          if (!v) {
+            slot.student = null;
+            info.classList.remove('show');
+            err.classList.remove('show');
+            return;
+          }
+          // Evitar duplicados
+          if (mainStudent && mainStudent.nie === v) {
+            slot.student = null;
+            info.classList.remove('show');
+            err.textContent = 'Ya está como estudiante principal';
+            err.classList.add('show');
+            return;
+          }
+          if (partners.some(p => p !== slot && p.student && p.student.nie === v)) {
+            slot.student = null;
+            info.classList.remove('show');
+            err.textContent = 'NIE ya agregado';
+            err.classList.add('show');
+            return;
+          }
+          const found = lookupNIE(v);
+          if (found) {
+            slot.student = found;
+            info.innerHTML = '<b>' + escapeHTML(found.name) + '</b><br><small>' + escapeHTML(found.grade) + '</small>';
+            info.classList.add('show');
+            err.classList.remove('show');
+          } else {
+            slot.student = null;
+            info.classList.remove('show');
+            if (v.length >= 4) {
+              err.textContent = 'NIE no encontrado';
+              err.classList.add('show');
+            } else {
+              err.classList.remove('show');
+            }
+          }
+        };
+        inp.addEventListener('input', validate);
+
+        removeBtn.addEventListener('click', () => {
+          const idx = partners.indexOf(slot);
+          if (idx >= 0) partners.splice(idx, 1);
+          field.style.transition = 'opacity 0.2s, transform 0.2s';
+          field.style.opacity = '0';
+          field.style.transform = 'translateX(20px)';
+          setTimeout(() => {
+            field.remove();
+            renumberPartners();
+            updateCounter();
+          }, 200);
+        });
+
+        partners.push(slot);
+        updateCounter();
+        setTimeout(() => inp.focus(), 50);
+      }
+
+      function renumberPartners() {
+        partners.forEach((p, i) => {
+          const num = i + 2;
+          const label = p.fieldEl.querySelector('label');
+          // Reemplazar solo el texto del badge y el número de compañero
+          label.innerHTML = `
+            <span class="coeduca-login-icon">${num}</span>
+            NIE del compañero ${num - 1}
+            <button type="button" class="coeduca-login-remove" title="Quitar">×</button>
+          `;
+          // Reasignar listener al nuevo botón
+          label.querySelector('.coeduca-login-remove').addEventListener('click', () => {
+            const idx = partners.indexOf(p);
+            if (idx >= 0) partners.splice(idx, 1);
+            p.fieldEl.style.transition = 'opacity 0.2s';
+            p.fieldEl.style.opacity = '0';
+            setTimeout(() => { p.fieldEl.remove(); renumberPartners(); updateCounter(); }, 200);
+          });
+        });
       }
 
       nieInput.addEventListener('input', validateMain);
-      partnerInput.addEventListener('input', validatePartner);
-
-      addPartnerBtn.addEventListener('click', () => {
-        partnerWrap.classList.toggle('coeduca-hidden');
-        if (partnerWrap.classList.contains('coeduca-hidden')) {
-          partnerInput.value = '';
-          partnerStudent = null;
-        }
-      });
+      addPartnerBtn.addEventListener('click', addPartnerField);
 
       const finish = () => {
         if (!mainStudent) return;
         state.student = mainStudent;
-        state.partner = partnerStudent;
+        // Solo guardamos compañeros válidos
+        state.partners = partners.filter(p => p.student).map(p => p.student);
+        // Compatibilidad: state.partner = el primero (si hay)
+        state.partner = state.partners[0] || null;
         saveState();
         if (global.rigo && global.rigo.loginSuccess) {
           global.rigo.loginSuccess(mainStudent.name);
         }
+        // Restaurar Rigo a su posición original tras el login
+        try {
+          const rigoEl = global.rigo;
+          if (rigoEl && rigoEl.dataset.savedTop !== undefined) {
+            rigoEl.style.top = rigoEl.dataset.savedTop;
+            rigoEl.style.left = rigoEl.dataset.savedLeft;
+            rigoEl.style.right = rigoEl.dataset.savedRight;
+            rigoEl.style.bottom = rigoEl.dataset.savedBottom;
+            // Si no había guardado nada, regresarlo al default (esquina inferior derecha)
+            if (!rigoEl.style.top && !rigoEl.style.bottom) {
+              rigoEl.style.top = 'auto';
+              rigoEl.style.left = 'auto';
+              rigoEl.style.right = '20px';
+              rigoEl.style.bottom = '20px';
+            }
+            rigoEl.style.zIndex = '9999';
+          }
+        } catch (e) {}
         overlay.style.transition = 'opacity 0.3s';
         overlay.style.opacity = '0';
         setTimeout(() => {
@@ -346,13 +479,19 @@
       if (prev && prev.student) {
         nieInput.value = prev.student.nie;
         validateMain();
-        if (prev.partner) {
-          partnerWrap.classList.remove('coeduca-hidden');
-          partnerInput.value = prev.partner.nie;
-          validatePartner();
-        }
+        // Restaurar compañeros (soporta state.partners[] nuevo o state.partner viejo)
+        const prevPartners = prev.partners || (prev.partner ? [prev.partner] : []);
+        prevPartners.forEach(p => {
+          addPartnerField();
+          const last = partners[partners.length - 1];
+          if (last) {
+            last.inputEl.value = p.nie;
+            last.inputEl.dispatchEvent(new Event('input'));
+          }
+        });
       }
 
+      updateCounter();
       setTimeout(() => nieInput.focus(), 400);
     });
   }
@@ -550,7 +689,9 @@
 
     const cfg = state.config;
     const stu = state.student || { nie: '-', name: '-', grade: '-' };
-    const partner = state.partner;
+    const partners = (state.partners && state.partners.length)
+      ? state.partners
+      : (state.partner ? [state.partner] : []);
     const score = getTotalScore();
     const today = new Date().toLocaleDateString('es-SV');
 
@@ -578,12 +719,7 @@
       doc.setTextColor(0, 0, 0);
     }
 
-    // Encabezado tabla
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setDrawColor(0, 0, 0);
-    doc.rect(left, y, right - left, 50);
-
+    // Encabezado tabla (altura dinámica según número de compañeros)
     const headerLines = [
       ['Profesor:', 'Jose Eliseo Martinez', 'Escuela:', 'COEDUCA'],
       ['Seccion:', 'A', 'Nivel:', sanitizeForPDF(cfg.level || '-')],
@@ -591,13 +727,18 @@
       ['NIE:', sanitizeForPDF(stu.nie), 'Nombre:', sanitizeForPDF(stu.name)],
       ['Grado:', sanitizeForPDF(stu.grade), '', '']
     ];
-    if (partner) {
+    partners.forEach((p, i) => {
       headerLines.push([
-        'NIE compa:', sanitizeForPDF(partner.nie),
-        'Compa:', sanitizeForPDF(partner.name)
+        'NIE compa ' + (i + 1) + ':', sanitizeForPDF(p.nie),
+        'Compa ' + (i + 1) + ':', sanitizeForPDF(p.name)
       ]);
-      doc.rect(left, y, right - left, 60);
-    }
+    });
+    const headerHeight = headerLines.length * 7 + 4;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setDrawColor(0, 0, 0);
+    doc.rect(left, y, right - left, headerHeight);
 
     doc.setFontSize(9);
     let yy = y + 5;
