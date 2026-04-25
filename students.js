@@ -1,7 +1,7 @@
 // Base de datos completa de estudiantes COEDUCA
 const STUDENTS = {
   // PRUEBAS
-  "12379": { name: "José Eliseo Martínez", grade: "Prueba" },
+  "1999": { name: "José Eliseo Martínez", grade: "Prueba" },
 
   // SÉPTIMO GRADO
   "20176653": { name: "Karen Aguilero", grade: "Séptimo" }, "20176654": { name: "Moisés Alfaro", grade: "Séptimo" },
