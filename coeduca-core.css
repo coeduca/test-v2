@@ -1,0 +1,406 @@
+/* ==========================================================================
+   COEDUCA Framework v1 - Core CSS (Pop Art)
+   Profesor José Eliseo Martínez - COEDUCA
+   ========================================================================== */
+
+:root {
+  --coeduca-primary: #FFD700;
+  --coeduca-accent: #FF6B9D;
+  --coeduca-bg: #FFF8E7;
+  --coeduca-surface: #FFFFFF;
+  --coeduca-stroke: #1a1a1a;
+  --coeduca-text: #1a1a1a;
+  --coeduca-success: #4CAF50;
+  --coeduca-error: #E63946;
+  --coeduca-info: #4FC3F7;
+  --coeduca-shadow: 4px 4px 0 #1a1a1a;
+  --coeduca-shadow-sm: 2px 2px 0 #1a1a1a;
+  --coeduca-shadow-lg: 6px 6px 0 #1a1a1a;
+  --coeduca-radius: 14px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -webkit-touch-callout: none;
+  margin: 0;
+  padding: 0;
+  font-family: 'Comic Sans MS', 'Chalkboard SE', system-ui, sans-serif;
+  background: var(--coeduca-bg);
+  color: var(--coeduca-text);
+  overflow-x: hidden;
+}
+
+/* Halftones de fondo (Pop Art) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.08) 1px, transparent 0);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.coeduca-app {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px 16px 140px;
+}
+
+/* ===== HEADER ===== */
+.coeduca-header {
+  background: var(--coeduca-primary);
+  border: 4px solid var(--coeduca-stroke);
+  border-radius: var(--coeduca-radius);
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  box-shadow: var(--coeduca-shadow);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.coeduca-header::after {
+  content: '';
+  position: absolute;
+  top: -20px; right: -20px;
+  width: 80px; height: 80px;
+  background: var(--coeduca-accent);
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 50%;
+  opacity: 0.4;
+}
+.coeduca-header h1 {
+  margin: 0 0 6px;
+  font-size: clamp(20px, 5vw, 30px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 2px 2px 0 var(--coeduca-surface);
+}
+.coeduca-header p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* ===== EXERCISE CARD ===== */
+.coeduca-exercise {
+  background: var(--coeduca-surface);
+  border: 4px solid var(--coeduca-stroke);
+  border-radius: var(--coeduca-radius);
+  padding: 18px;
+  margin-bottom: 22px;
+  box-shadow: var(--coeduca-shadow);
+  animation: coeducaPopIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes coeducaPopIn {
+  0%   { opacity: 0; transform: scale(0.85) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.coeduca-exercise-title {
+  display: inline-block;
+  background: var(--coeduca-accent);
+  color: var(--coeduca-surface);
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 10px;
+  padding: 6px 14px;
+  margin: -28px 0 14px -8px;
+  font-size: 16px;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: var(--coeduca-shadow-sm);
+  text-shadow: 1px 1px 0 var(--coeduca-stroke);
+}
+.coeduca-exercise-instruction {
+  background: #FFF;
+  border-left: 5px solid var(--coeduca-primary);
+  padding: 8px 12px;
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-style: italic;
+  font-weight: bold;
+}
+.coeduca-exercise-score {
+  float: right;
+  background: var(--coeduca-primary);
+  border: 2px solid var(--coeduca-stroke);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 900;
+  margin-left: 10px;
+}
+
+/* ===== NOTE (escape hatch) ===== */
+.coeduca-note {
+  background: #FFF;
+  border: 3px dashed var(--coeduca-stroke);
+  border-radius: var(--coeduca-radius);
+  padding: 14px 18px;
+  margin-bottom: 22px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.coeduca-note img,
+.coeduca-note video {
+  max-width: 100%;
+  height: auto;
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 10px;
+  display: block;
+  margin: 8px auto;
+}
+
+/* ===== AUDIO PLAYER ===== */
+.coeduca-audio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--coeduca-info);
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 50px;
+  padding: 8px 16px 8px 8px;
+  margin: 0 0 16px;
+  box-shadow: var(--coeduca-shadow-sm);
+  width: fit-content;
+  max-width: 100%;
+}
+.coeduca-audio-btn {
+  width: 48px; height: 48px;
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 50%;
+  background: var(--coeduca-surface);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.coeduca-audio-btn:hover { transform: scale(1.08); }
+.coeduca-audio-btn:active { transform: scale(0.92); }
+.coeduca-audio-btn svg {
+  width: 22px; height: 22px;
+  fill: var(--coeduca-stroke);
+}
+.coeduca-audio-label {
+  font-weight: 900;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+/* ===== EXERCISE IMAGE ===== */
+.coeduca-exercise-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 16px;
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 10px;
+}
+
+/* ===== BUTTONS ===== */
+.coeduca-btn {
+  display: inline-block;
+  background: var(--coeduca-primary);
+  color: var(--coeduca-stroke);
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 900;
+  font-family: inherit;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: var(--coeduca-shadow-sm);
+  transition: transform 0.12s, box-shadow 0.12s;
+  text-decoration: none;
+}
+.coeduca-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: var(--coeduca-shadow);
+}
+.coeduca-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--coeduca-stroke);
+}
+.coeduca-btn-accent { background: var(--coeduca-accent); color: var(--coeduca-surface); }
+.coeduca-btn-success { background: var(--coeduca-success); color: var(--coeduca-surface); }
+.coeduca-btn-info { background: var(--coeduca-info); color: var(--coeduca-stroke); }
+
+/* ===== INPUTS ===== */
+.coeduca-input {
+  background: var(--coeduca-surface);
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: bold;
+  font-family: inherit;
+  color: var(--coeduca-text);
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.coeduca-input:focus {
+  background: #FFFEF0;
+  box-shadow: var(--coeduca-shadow-sm);
+}
+.coeduca-input.correct {
+  background: #C8E6C9;
+  border-color: var(--coeduca-success);
+}
+.coeduca-input.wrong {
+  background: #FFCDD2;
+  border-color: var(--coeduca-error);
+}
+
+/* ===== LOGIN MODAL ===== */
+.coeduca-login-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 9998;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  animation: coeducaFadeIn 0.3s;
+}
+@keyframes coeducaFadeIn { from {opacity:0} to {opacity:1} }
+.coeduca-login-modal {
+  background: var(--coeduca-surface);
+  border: 5px solid var(--coeduca-stroke);
+  border-radius: var(--coeduca-radius);
+  padding: 24px 22px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: var(--coeduca-shadow-lg);
+  animation: coeducaPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.coeduca-login-modal h2 {
+  margin: 0 0 6px;
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 22px;
+  color: var(--coeduca-accent);
+  text-shadow: 2px 2px 0 var(--coeduca-stroke);
+}
+.coeduca-login-modal p {
+  text-align: center;
+  font-size: 13px;
+  margin: 0 0 16px;
+  font-weight: bold;
+}
+.coeduca-login-field { margin-bottom: 12px; }
+.coeduca-login-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.coeduca-login-field .coeduca-input { width: 100%; }
+.coeduca-login-info {
+  background: #E8F5E9;
+  border: 2px solid var(--coeduca-success);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 6px;
+  display: none;
+}
+.coeduca-login-info.show { display: block; }
+.coeduca-login-error {
+  background: #FFEBEE;
+  border: 2px solid var(--coeduca-error);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  margin-top: 6px;
+  color: var(--coeduca-error);
+  display: none;
+}
+.coeduca-login-error.show { display: block; }
+.coeduca-login-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.coeduca-login-actions .coeduca-btn { flex: 1; min-width: 130px; }
+
+/* ===== EXTRA POINTS BADGE ===== */
+.coeduca-extra-badge {
+  position: fixed;
+  top: 14px; left: 14px;
+  background: var(--coeduca-accent);
+  color: var(--coeduca-surface);
+  border: 3px solid var(--coeduca-stroke);
+  border-radius: 50px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow: var(--coeduca-shadow-sm);
+  z-index: 100;
+  text-shadow: 1px 1px 0 var(--coeduca-stroke);
+}
+
+/* ===== FINAL SCORE ===== */
+.coeduca-final-score {
+  background: var(--coeduca-primary);
+  border: 5px solid var(--coeduca-stroke);
+  border-radius: var(--coeduca-radius);
+  padding: 22px;
+  margin: 30px 0;
+  text-align: center;
+  box-shadow: var(--coeduca-shadow-lg);
+}
+.coeduca-final-score h2 {
+  margin: 0 0 10px;
+  font-size: 24px;
+  text-transform: uppercase;
+}
+.coeduca-final-score .score-number {
+  font-size: 48px;
+  font-weight: 900;
+  color: var(--coeduca-accent);
+  text-shadow: 3px 3px 0 var(--coeduca-stroke);
+  display: block;
+  margin: 8px 0;
+}
+
+/* ===== FEEDBACK INLINE ===== */
+.coeduca-feedback {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 18px;
+  font-weight: 900;
+  vertical-align: middle;
+}
+.coeduca-feedback.correct { color: var(--coeduca-success); }
+.coeduca-feedback.wrong { color: var(--coeduca-error); }
+
+/* ===== UTILITY ===== */
+.coeduca-hidden { display: none !important; }
+.coeduca-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.coeduca-center { text-align: center; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 480px) {
+  .coeduca-app { padding: 14px 10px 130px; }
+  .coeduca-exercise { padding: 14px; }
+  .coeduca-extra-badge { font-size: 12px; padding: 6px 10px; top: 8px; left: 8px; }
+}

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html translate="no" lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="google" content="notranslate">
+  <meta http-equiv="Content-Language" content="es">
+  <title>Verb To Be - Séptimo</title>
+  <link rel="stylesheet" href="coeduca-core.css">
+</head>
+<body>
+
+  <div id="app"></div>
+
+  <!-- Scripts en orden -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="students.js"></script>
+  <script src="rigo.js"></script>
+  <script src="coeduca-core.js"></script>
+  <script src="coeduca-exercises.js"></script>
+  <script src="coeduca-games.js"></script>
+
+  <rigo-mascot></rigo-mascot>
+
+  <script>
+    COEDUCA.init({
+      container: '#app',
+      topic: 'Verb To Be',
+      level: 'Séptimo',
+      colors: {
+        primary: '#FFD700',
+        accent: '#FF6B9D',
+        bg: '#FFF8E7'
+      },
+      exercises: [
+        { type: 'note', html: '<p><b>Bienvenido.</b> Hoy practicamos el verbo <i>to be</i>. Lee con calma cada ejercicio.</p>' },
+
+        {
+          type: 'wordsearch',
+          title: 'Find the forms of "to be"',
+          instruction: 'Encuentra estas formas en la sopa de letras.',
+          dataA: { words: ['AM', 'IS', 'ARE', 'WAS', 'WERE'], gridSize: 10 },
+          dataB: { words: ['BEEN', 'BEING', 'IS', 'ARE', 'AM'], gridSize: 10 }
+        },
+
+        {
+          type: 'fillblank',
+          title: 'Complete with am / is / are',
+          instruction: 'Escribe la forma correcta del verbo.',
+          dataA: [
+            { text: 'I ___ a student.', answer: 'am' },
+            { text: 'She ___ happy.', answer: 'is' },
+            { text: 'They ___ from El Salvador.', answer: 'are' },
+            { text: 'You ___ tall.', answer: 'are' },
+            { text: 'It ___ a cat.', answer: 'is' }
+          ],
+          dataB: [
+            { text: 'We ___ friends.', answer: 'are' },
+            { text: 'He ___ tired.', answer: 'is' },
+            { text: 'I ___ ready.', answer: 'am' },
+            { text: 'They ___ in school.', answer: 'are' },
+            { text: 'She ___ a teacher.', answer: 'is' }
+          ]
+        },
+
+        {
+          type: 'multiplechoice',
+          title: 'Choose the correct option',
+          dataA: [
+            { q: '___ you a doctor?', options: ['Are', 'Is', 'Am'], answer: 0 },
+            { q: 'My mother ___ a nurse.', options: ['am', 'is', 'are'], answer: 1 },
+            { q: 'They ___ at home.', options: ['is', 'am', 'are'], answer: 2 }
+          ],
+          dataB: [
+            { q: 'I ___ tired today.', options: ['am', 'is', 'are'], answer: 0 },
+            { q: 'The cat ___ on the table.', options: ['are', 'is', 'am'], answer: 1 },
+            { q: 'We ___ from El Salvador.', options: ['is', 'am', 'are'], answer: 2 }
+          ]
+        },
+
+        {
+          type: 'truefalse',
+          title: 'True or False',
+          dataA: [
+            { statement: '"She is happy" is correct grammar.', answer: true },
+            { statement: '"They is friends" is correct grammar.', answer: false },
+            { statement: '"I am a student" is correct grammar.', answer: true }
+          ],
+          dataB: [
+            { statement: '"We are tall" is correct grammar.', answer: true },
+            { statement: '"He are tired" is correct grammar.', answer: false },
+            { statement: '"It is a dog" is correct grammar.', answer: true }
+          ]
+        },
+
+        {
+          type: 'matchimage',
+          title: 'Match the family',
+          dataA: [
+            { word: 'Father', emoji: '👨' },
+            { word: 'Mother', emoji: '👩' },
+            { word: 'Brother', emoji: '👦' },
+            { word: 'Sister', emoji: '👧' }
+          ]
+        }
+      ],
+      game: {
+        type: 'hangman',
+        words: ['STUDENT', 'TEACHER', 'SCHOOL', 'ENGLISH', 'COEDUCA']
+      }
+    });
+  </script>
+
+</body>
+</html>
