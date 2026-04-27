@@ -24,7 +24,8 @@
 
   const EMOTIONS = [
     'neutral', 'welcome', 'happy', 'confused', 'thinking',
-    'sneaky', 'sad', 'excited', 'game', 'love', 'angry', 'easterEgg'
+    'sneaky', 'sad', 'excited', 'game', 'love', 'angry',
+    'dizzy', 'musical', 'elder', 'easterEgg'
   ];
 
   // MENSAJES: cada uno puede tener:
@@ -43,42 +44,52 @@
     { text: "Learning is cool", grade: null, emotion: 'happy' },
     { text: "You're doing great!", grade: null, emotion: 'excited' },
     { text: "Respira y continúa", grade: null, emotion: 'neutral' },
-    { text: "One step at a time", grade: null, emotion: 'thinking' }
+    { text: "Tranqui", grade: null, emotion: 'thinking' }
   ];
 
   // HINTS: si grade es null aparecen para todos los grados.
   //        si grade es un array, solo aparecen para esos grados.
   //        emotion fuerza una emoción específica al mostrar el hint.
   // Emociones disponibles: neutral, welcome, happy, confused, thinking,
-  //                        sneaky, sad, excited, game, love, angry
+  //                        sneaky, sad, excited, game, love, angry,
+  //                        dizzy, musical, elder
   // Grados válidos: "Séptimo", "Octavo", "Noveno", "Primer Año", "Segundo Año", "Prueba"
   const HINT_MESSAGES = [
-    { text: "Psst... piensa en el pasado", grade: null, emotion: 'sneaky' },
-    { text: "Tranqui, revisa la pregunta otra vez", grade: null, emotion: 'thinking' },
-    { text: "Una pista: lee despacio", grade: null, emotion: 'sneaky' },
-    { text: "Confía en tus idea", grade: null, emotion: 'happy' },
-    { text: "¿Ya intentaste? ¡Tú puedes!", grade: null, emotion: 'excited' },
-    { text: "Shhh no le digas al teacher Eliseo", grade: null, emotion: 'sneaky' },
-    { text: "Que Dios te ayude porque yo no", grade: null, emotion: 'confused' },
+    { text: "Psst... usa el cerebro", grade: null, emotion: 'sneaky' },
+    { text: "Lo estás haciendo bien", grade: null, emotion: 'thinking' },
+    { text: "Una pista: revisa el cuaderno", grade: null, emotion: 'sneaky' },
+    { text: "Hoy es un buen día", grade: null, emotion: 'happy' },
+    { text: "Seguro 10", grade: null, emotion: 'excited' },
+	{ text: "Soy camaleón, no rana", grade: null, emotion: 'angry' },
+	{ text: "Ani ayuwoki 🎶", grade: null, emotion: 'musical' },
+    { text: "Shhh no le digas al teacher", grade: null, emotion: 'sneaky' },
+	{ text: "Duolingo me hace los mandados", grade: null, emotion: 'game' },
+    { text: "¿Necesitas ayuda?", grade: null, emotion: 'confused' },
     { text: "La respuesta está en tu corazón", grade: null, emotion: 'love' },
-    { text: "Deja de tocarme o llamo a mi abogado", grade: null, emotion: 'angry' },
-    { text: "Demérito por tocarme", grade: null, emotion: 'angry' },
-    { text: "Ya ni le muevas, no sé inglés", grade: null, emotion: 'sad' },
-    { text: "Don Roman, toque ya!", grade: null, emotion: 'sad' },
-    { text: "Esto es culpa de Darwin", grade: ["Noveno"], emotion: 'angry' },
-    { text: "¿Todavía no has terminado?", grade: null, emotion: 'confused' },
-    { text: "¿Porqué querían ponerme nombres raros?", grade: null, emotion: 'confused' },
+    { text: "Deja de tocarme", grade: null, emotion: 'angry' },
+    { text: "No te distraigas", grade: null, emotion: 'angry' },
+    { text: "No sé inglés", grade: null, emotion: 'sad' },
+    { text: "Necesito recreo ya!", grade: null, emotion: 'sad' },
+    { text: "Esta respuesta la sabe Wilmer", grade: ["Segundo Año"], emotion: 'sneaky' },
+    { text: "Detecto un mal espíritu cerca", grade: ["Segundo Año"], emotion: 'sad' },	
+    { text: "Me invitas a tu graduación... si te graduas", grade: ["Segundo Año"], emotion: 'sneaky' },	
+	{ text: "¿Que si quien es María José? no la conozco", grade: ["Primer Año"], emotion: 'excited' },
+	{ text: "Una de aquí no me pudo ganar en XO", grade: ["Primer Año"], emotion: 'game' },	
+    { text: "¿Todavía no has terminado?", grade: null, emotion: 'elder' },
     { text: "Yo ya hubiera terminado", grade: null, emotion: 'sneaky' },
     { text: "¿Ya viste el nuevo capítulo de la Rosa de Guadalupe?", grade: null, emotion: 'excited' },
     { text: "Google Translate está llorando", grade: null, emotion: 'sneaky' },
     { text: "Si fallas, te convierto en sopa de letras", grade: null, emotion: 'angry' },
-    { text: "Respira, no es cálculo", grade: null, emotion: 'neutral' },
-    { text: "El inglés es como el yo: guapo", grade: null, emotion: 'love' },
+    { text: "Respira, no es matemática", grade: null, emotion: 'neutral' },
+    { text: "El inglés es como yo: guapo", grade: null, emotion: 'love' },
     { text: "Yo solo soy un camaleón, no un traductor", grade: null, emotion: 'sad' },
     { text: "Estoy solito, no hay nadie aquí a mi lado", grade: null, emotion: 'sad' },
-    { text: "Ojo por ojo...", grade: null, emotion: 'sneaky' },
+    { text: "...", grade: null, emotion: 'sneaky' },
     { text: "Esta pregunta la sabe hasta mi abuela", grade: null, emotion: 'sneaky' },
-    { text: "¿Y si mejor estudias? (broma, sigue)", grade: null, emotion: 'sneaky' }
+	{ text: "Han pasado 84 años", grade: null, emotion: 'elder' },
+	{ text: "¿Ya vas a terminar?", grade: null, emotion: 'dizzy' },
+	{ text: "Tranqui! yo perreo sola 🎶", grade: null, emotion: 'musical' },
+    { text: "¿Y si mejor estudias?", grade: null, emotion: 'sneaky' }
   ];
 
   const CHEER_MESSAGES = [
@@ -103,6 +114,7 @@
       this.randomTimer = null;
       this.blinkTimer = null;
       this.grade = null;
+      this.emotionTimer = null;
 
       this.isDragging = false;
       this.dragOffsetX = 0;
@@ -119,7 +131,9 @@
     connectedCallback() {
       this.grade = this.getAttribute('grade') || null;
       this.render();
-      this.restorePosition();
+      // No restauramos posición previa: Rigo siempre arranca en su esquina por
+      // defecto (abajo-derecha). El estudiante puede arrastrarlo durante la
+      // sesión, pero al recargar vuelve a su lugar.
       this.setupInteractions();
       this.startRandomMessages();
       this.startBlinking();
@@ -129,6 +143,7 @@
       clearTimeout(this.randomTimer);
       clearInterval(this.blinkTimer);
       clearTimeout(this.bubbleTimer);
+	  clearTimeout(this.emotionTimer);
     }
 
     // Filtra mensajes según grado: null = todos; array = solo esos grados.
@@ -203,6 +218,85 @@
              <ellipse cx="28" cy="105" rx="3" ry="2"/>
            </g>`
         : '';
+
+      // Mareo: estrellas/espirales orbitando la cabeza + gota de sudor
+      const dizzyMark = emotion === 'dizzy'
+        ? `<g class="rigo-dizzy-orbit" style="transform-origin: 100px 50px;">
+             <text x="60" y="35" font-family="Impact, sans-serif" font-size="22" fill="#FFD93D" stroke="#1a1a1a" stroke-width="1.2" font-weight="bold">★</text>
+             <text x="135" y="32" font-family="Impact, sans-serif" font-size="18" fill="#A8E6CF" stroke="#1a1a1a" stroke-width="1.2" font-weight="bold">✦</text>
+             <text x="100" y="22" font-family="Impact, sans-serif" font-size="16" fill="#FF6B9D" stroke="#1a1a1a" stroke-width="1" font-weight="bold">✶</text>
+           </g>
+           <path d="M 168 70 Q 172 80 168 88 Q 164 80 168 70 Z" fill="#4FC3F7" stroke="#1a1a1a" stroke-width="1.5"/>`
+        : '';
+
+      // Musical: micrófono + notas musicales flotando
+      const musicalMark = emotion === 'musical'
+        ? `<g>
+             <!-- Micrófono frente a la boca -->
+             <ellipse cx="100" cy="155" rx="11" ry="13" fill="#3a3a3a" stroke="#1a1a1a" stroke-width="2.5"/>
+             <ellipse cx="100" cy="153" rx="8" ry="10" fill="#5a5a5a" stroke="none"/>
+             <g stroke="#1a1a1a" stroke-width="0.8" opacity="0.6">
+               <line x1="94" y1="150" x2="106" y2="150"/>
+               <line x1="93" y1="155" x2="107" y2="155"/>
+               <line x1="94" y1="160" x2="106" y2="160"/>
+             </g>
+             <rect x="97" y="166" width="6" height="14" fill="#1a1a1a"/>
+             <rect x="93" y="178" width="14" height="4" rx="1" fill="#1a1a1a"/>
+           </g>
+           <g class="rigo-music-float">
+             <!-- Nota musical 1 -->
+             <g transform="translate(20, 30)">
+               <circle cx="0" cy="14" r="5" fill="#FF6B9D" stroke="#1a1a1a" stroke-width="1.8"/>
+               <path d="M 5 14 L 5 -2 L 18 -6 L 18 6" fill="none" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round"/>
+               <path d="M 5 -2 L 18 -6" fill="none" stroke="#1a1a1a" stroke-width="2.5"/>
+             </g>
+             <!-- Nota musical 2 -->
+             <g transform="translate(160, 45)">
+               <circle cx="0" cy="10" r="4" fill="#4ECDC4" stroke="#1a1a1a" stroke-width="1.5"/>
+               <path d="M 4 10 L 4 -4" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round"/>
+               <path d="M 4 -4 Q 10 -2 8 4" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round"/>
+             </g>
+             <!-- Nota musical 3 -->
+             <g transform="translate(170, 90)">
+               <circle cx="0" cy="8" r="3.5" fill="#FFE66D" stroke="#1a1a1a" stroke-width="1.5"/>
+               <path d="M 3.5 8 L 3.5 -3" fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+             </g>
+           </g>`
+        : '';
+
+      // Anciano: anteojos redondos + barba blanca + bastón
+      const elderMark = emotion === 'elder'
+        ? `<g>
+             <!-- Anteojos redondos sobre los ojos -->
+             <circle cx="55" cy="88" r="22" fill="none" stroke="#1a1a1a" stroke-width="3"/>
+             <circle cx="145" cy="88" r="22" fill="none" stroke="#1a1a1a" stroke-width="3"/>
+             <line x1="77" y1="88" x2="123" y2="88" stroke="#1a1a1a" stroke-width="3"/>
+             <!-- Reflejo del cristal -->
+             <path d="M 42 80 Q 48 75 56 78" fill="none" stroke="#fff" stroke-width="2" opacity="0.6"/>
+             <path d="M 132 80 Q 138 75 146 78" fill="none" stroke="#fff" stroke-width="2" opacity="0.6"/>
+           </g>
+           <!-- Cejas blancas pobladas -->
+           <g fill="#f5f5f5" stroke="#1a1a1a" stroke-width="1.5">
+             <path d="M 40 65 Q 55 58 72 64 Q 70 70 55 68 Q 45 70 40 65 Z"/>
+             <path d="M 128 64 Q 145 58 160 65 Q 155 70 145 68 Q 130 70 128 64 Z"/>
+           </g>
+           <!-- Barba blanca debajo del mentón -->
+           <g fill="#f5f5f5" stroke="#1a1a1a" stroke-width="2">
+             <path d="M 80 132 Q 75 145 80 158 Q 88 165 95 158 Q 100 168 105 158 Q 112 165 120 158 Q 125 145 120 132 Q 100 138 80 132 Z"/>
+           </g>
+           <g stroke="#cccccc" stroke-width="0.8" opacity="0.7">
+             <path d="M 85 140 L 85 152" fill="none"/>
+             <path d="M 95 142 L 95 156" fill="none"/>
+             <path d="M 105 142 L 105 156" fill="none"/>
+             <path d="M 115 140 L 115 152" fill="none"/>
+           </g>
+           <!-- Bastón a la derecha -->
+           <g stroke="#8B4513" stroke-width="4" stroke-linecap="round" fill="none">
+             <path d="M 175 90 Q 178 88 180 92 L 180 175"/>
+           </g>
+           <circle cx="178" cy="89" r="4" fill="#A0522D" stroke="#1a1a1a" stroke-width="1.5"/>`
+        : '';
+
 
       return `
         <svg viewBox="0 0 200 200" width="100%" height="100%" ${bodyAnim}>
@@ -298,6 +392,9 @@
           ${thoughtBubble}
           ${tear}
           ${angryMark}
+          ${dizzyMark}
+          ${musicalMark}
+          ${elderMark}
 
           <!-- BRILLO SUPERIOR -->
           <ellipse cx="85" cy="58" rx="14" ry="6" fill="#fff" opacity="0.3"/>
@@ -369,6 +466,27 @@
           rightEye = this.angryEye(RE_CX, RE_CY);
           mouth = `<path d="M 85 125 Q 100 118 115 125 Q 110 128 100 126 Q 90 128 85 125 Z" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="2.5" stroke-linejoin="round"/>
                    <path d="M 92 126 L 94 130 M 98 126 L 98 131 M 104 126 L 106 130" stroke="#fff" stroke-width="1.2" stroke-linecap="round"/>`;
+          break;
+        case 'dizzy':
+          leftEye = this.spiralEye(LE_CX, LE_CY);
+          rightEye = this.spiralEye(RE_CX, RE_CY);
+          // Boca ondulada estilo "uuugh"
+          mouth = `<path d="M 82 124 Q 88 120 94 124 Q 100 128 106 124 Q 112 120 118 124" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round"/>`;
+          break;
+        case 'musical':
+          // Ojos cerrados cantando con cejas alegres
+          leftEye = this.singingEye(LE_CX, LE_CY);
+          rightEye = this.singingEye(RE_CX, RE_CY);
+          // Boca abierta cantando "O"
+          mouth = `<ellipse cx="100" cy="126" rx="9" ry="12" fill="#1a1a1a" stroke="#1a1a1a" stroke-width="2.5"/>
+                   <ellipse cx="100" cy="129" rx="6" ry="7" fill="#FF3366"/>`;
+          break;
+        case 'elder':
+          // Ojos pequeños y cansados (los anteojos van encima vía elderMark)
+          leftEye = this.smallEye(LE_CX, LE_CY);
+          rightEye = this.smallEye(RE_CX, RE_CY);
+          // Sonrisa amable y serena (más leve que happy)
+          mouth = `<path d="M 88 124 Q 100 130 112 124" fill="none" stroke="#1a1a1a" stroke-width="3" stroke-linecap="round"/>`;
           break;
         case 'neutral':
         default:
@@ -455,6 +573,39 @@
           <!-- ceja gruesa inclinada -->
           <path d="M ${cx - 12 * toward} ${cy - 11} L ${cx + 12 * toward} ${cy - 4}"
                 stroke="#1a1a1a" stroke-width="5" stroke-linecap="round"/>
+        </g>
+      `;
+    }
+
+    // Ojo en espiral estilo cómic para mareo/náuseas
+    spiralEye(cx, cy) {
+      return `
+        <g>
+          <ellipse cx="${cx}" cy="${cy}" rx="18" ry="17" class="rigo-skin" stroke="#1a1a1a" stroke-width="3"/>
+          <circle cx="${cx}" cy="${cy}" r="13" fill="#fff" stroke="#1a1a1a" stroke-width="2.5"/>
+          <path d="M ${cx} ${cy}
+                   m -1 0
+                   a 2 2 0 1 1 2 0
+                   a 4 4 0 1 1 -4 0
+                   a 6 6 0 1 1 6 0
+                   a 8 8 0 1 1 -8 0
+                   a 10 10 0 1 1 10 0"
+                fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+        </g>
+      `;
+    }
+
+    // Ojo cerrado cantando feliz (curva en forma de U invertida con pestañas)
+    singingEye(cx, cy) {
+      return `
+        <g>
+          <ellipse cx="${cx}" cy="${cy}" rx="18" ry="17" class="rigo-skin" stroke="#1a1a1a" stroke-width="3"/>
+          <path d="M ${cx - 11} ${cy + 3} Q ${cx} ${cy - 8} ${cx + 11} ${cy + 3}"
+                fill="none" stroke="#1a1a1a" stroke-width="3.5" stroke-linecap="round"/>
+          <!-- pestañas alegres -->
+          <path d="M ${cx - 11} ${cy + 3} L ${cx - 14} ${cy + 1}" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+          <path d="M ${cx + 11} ${cy + 3} L ${cx + 14} ${cy + 1}" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+          <path d="M ${cx} ${cy - 5} L ${cx} ${cy - 8}" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
         </g>
       `;
     }
@@ -551,6 +702,66 @@
           }
           :host([data-emotion="angry"]) #svg-container {
             animation: rigoShake 0.15s infinite linear;
+          }
+
+          /* Mareo: piel verdosa enferma + tambaleo lento */
+          @keyframes dizzySkin {
+            0%, 100% { fill: #A8C97A; }
+            50%      { fill: #8FB868; }
+          }
+          @keyframes dizzyStroke {
+            0%, 100% { stroke: #A8C97A; }
+            50%      { stroke: #8FB868; }
+          }
+          :host([data-emotion="dizzy"]) .rigo-skin {
+            animation: dizzySkin 1.2s infinite ease-in-out;
+            fill: #A8C97A;
+          }
+          :host([data-emotion="dizzy"]) .rigo-skin-stroke {
+            animation: dizzyStroke 1.2s infinite ease-in-out;
+            stroke: #A8C97A;
+          }
+          @keyframes rigoSway {
+            0%, 100% { transform: rotate(-4deg); }
+            50%      { transform: rotate(4deg); }
+          }
+          :host([data-emotion="dizzy"]) #svg-container {
+            animation: rigoSway 1.4s infinite ease-in-out;
+          }
+          @keyframes dizzyOrbit {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .rigo-dizzy-orbit {
+            animation: dizzyOrbit 2s infinite linear;
+          }
+
+          /* Musical: balanceo rítmico + notas flotando */
+          @keyframes rigoSing {
+            0%, 100% { transform: translateY(0) rotate(-2deg); }
+            50%      { transform: translateY(-4px) rotate(2deg); }
+          }
+          :host([data-emotion="musical"]) #svg-container {
+            animation: rigoSing 0.6s infinite ease-in-out;
+          }
+          @keyframes musicFloat {
+            0%   { transform: translateY(0); opacity: 0.4; }
+            50%  { transform: translateY(-8px); opacity: 1; }
+            100% { transform: translateY(-16px); opacity: 0; }
+          }
+          .rigo-music-float {
+            animation: musicFloat 1.8s infinite ease-out;
+          }
+
+          /* Anciano: movimiento muy lento y tembloroso */
+          @keyframes elderTremble {
+            0%, 100% { transform: translateX(0) translateY(0); }
+            25%      { transform: translateX(0.5px) translateY(-0.3px); }
+            50%      { transform: translateX(-0.3px) translateY(0.4px); }
+            75%      { transform: translateX(0.4px) translateY(0.2px); }
+          }
+          :host([data-emotion="elder"]) #svg-container {
+            animation: elderTremble 0.5s infinite linear;
           }
           @keyframes rigoIdle {
             0%, 100% { transform: translateY(0) rotate(0); }
@@ -676,27 +887,33 @@
     handleTap() {
       if (Math.random() < 0.008) {
         this.setEmotion('easterEgg');
-        this.say("¡Modo POP ART desbloqueado!", 3500);
-        setTimeout(() => this.setEmotion('neutral'), 3500);
+        this.say("¡Modo POP ART desbloqueado!", 4000);
+        
+        // Limpiamos la emoción anterior si el usuario hizo clic rápido
+        if (this.emotionTimer) clearTimeout(this.emotionTimer);
+        this.emotionTimer = setTimeout(() => this.setEmotion('neutral'), 4000);
         return;
       }
+      
       const msg = this.pickMessage(HINT_MESSAGES);
       const emotion = msg.emotion || 'sneaky';
+      
       this.setEmotion(emotion);
       this.say(msg.text, 4000);
+      
       this.dispatchEvent(new CustomEvent('rigo-hint-requested', {
         bubbles: true, composed: true,
         detail: { hint: msg.text, emotion }
       }));
-      setTimeout(() => this.setEmotion('neutral'), 4000);
+      
+      if (this.emotionTimer) clearTimeout(this.emotionTimer);
+      this.emotionTimer = setTimeout(() => this.setEmotion('neutral'), 4000);
     }
 
     savePosition() {
-      try {
-        localStorage.setItem('rigo_pos', JSON.stringify({
-          left: this.style.left, top: this.style.top
-        }));
-      } catch (e) { /* silencioso */ }
+      // Posición no persistida: cada recarga vuelve a la esquina por defecto.
+      // Si el estudiante lo arrastra, se mantiene durante la sesión.
+      try { localStorage.removeItem('rigo_pos'); } catch (e) { /* silencioso */ }
     }
 
     restorePosition() {
@@ -789,7 +1006,9 @@
       this.setEmotion('excited');
       const msg = CHEER_MESSAGES[Math.floor(Math.random() * CHEER_MESSAGES.length)];
       this.say(msg, 2500);
-      setTimeout(() => this.setEmotion('happy'), 2500);
+      
+      if (this.emotionTimer) clearTimeout(this.emotionTimer);
+      this.emotionTimer = setTimeout(() => this.setEmotion('happy'), 2500);
     }
 
     comfort() {

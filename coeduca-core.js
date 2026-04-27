@@ -20,7 +20,21 @@
   'use strict';
 
   const STORAGE_KEY_PREFIX = 'coeduca_';
-  const VERSION = '1.0.0';
+  const VERSION = '1.2.0';
+
+  // =====================================================================
+  // FILTRO DE NIVEL POR GRADO
+  // =====================================================================
+  // El profesor puede pasar level: 'A1+' o 'PreA1' a COEDUCA.init para
+  // restringir qué estudiantes pueden acceder. El NIE de prueba (José Eliseo)
+  // siempre está permitido en cualquier nivel.
+  // OJO: en students.js los grados de bachillerato vienen sin tilde
+  //      ("Primer Ano", "Segundo Ano"). Cuidado con la inconsistencia.
+  const LEVEL_FILTERS = {
+    'A1+':   ['Noveno', 'Primer Ano', 'Primer Año', 'Segundo Ano', 'Segundo Año'],
+    'PreA1': ['Séptimo', 'Septimo', 'Octavo']
+  };
+  const TEST_NIE = '1999'; // José Eliseo - siempre permitido
 
   // =====================================================================
   // 1. STATE GLOBAL
@@ -32,7 +46,8 @@
     partners: [],         // array de hasta 4 compañeros
     poolVersion: null,    // 'A' | 'B'
     answers: {},          // { exerciseId: { score, total, details } }
-    extraPoints: 0,       // del juego final
+    extraPoints: 0,       // mejor resultado del juego final (NO acumula entre rondas)
+    gameResult: null,     // 'win' | 'tie' | 'lose' | null  - último resultado del juego
     storageKey: '',
     appRoot: null,
     exerciseRegistry: {}, // tipos registrados por coeduca-exercises.js
@@ -117,6 +132,25 @@
   }
 
   // =====================================================================
+  // 4b. ANTI-BFCACHE
+  // =====================================================================
+  // Cuando el alumno navega "atrás" desde otra pestaña, Safari/Chrome móvil
+  // pueden restaurar la página desde el back-forward cache. En ese caso el DOM
+  // se restaura tal cual (incluyendo botones del hangman ya marcados como
+  // disabled, fichas arrastradas, etc.) pero el JavaScript NO se vuelve a
+  // ejecutar, así que el estado visual queda inconsistente con state.answers.
+  // Forzamos un reload completo en ese caso para que todo vuelva a montarse
+  // limpio, leyendo el progreso real desde localStorage.
+  function setupBfCacheGuard() {
+    window.addEventListener('pageshow', function (e) {
+      if (e.persisted) {
+        // La página viene del bfcache: recargar para reconstruir UI desde state.
+        location.reload();
+      }
+    });
+  }
+
+  // =====================================================================
   // 5. POOL A/B SELECTOR (persistente)
   // =====================================================================
   function pickPoolVersion() {
@@ -149,7 +183,8 @@
         partners: state.partners,
         poolVersion: state.poolVersion,
         answers: state.answers,
-        extraPoints: state.extraPoints
+        extraPoints: state.extraPoints,
+        gameResult: state.gameResult
       };
       localStorage.setItem(state.storageKey + 'state', JSON.stringify(snapshot));
     } catch (e) { /* silencioso */ }
@@ -163,10 +198,49 @@
     } catch (e) { return null; }
   }
 
-  function recordAnswer(exerciseId, score, total, details) {
-    state.answers[exerciseId] = { score, total, details: details || null };
+  function recordAnswer(exerciseId, score, total, details, userAnswer) {
+    // userAnswer: snapshot crudo de lo que el alumno respondió.
+    // Si el renderer no lo manda (renderers viejos), se preserva el que ya hubiera.
+    const prev = state.answers[exerciseId] || {};
+    state.answers[exerciseId] = {
+      score,
+      total,
+      details: details || null,
+      userAnswer: (userAnswer !== undefined ? userAnswer : (prev.userAnswer || null)),
+      completedAt: Date.now()
+    };
     saveState();
     updateScoreDisplay();
+  }
+
+  // Calcula cuántos puntos debería valer un ejercicio que aún no se ha respondido.
+  // Usamos el promedio del puntaje "total" de los ejercicios ya respondidos,
+  // o un valor por defecto de 1 punto por ítem si aún no hay ninguno respondido.
+  // De este modo la nota refleja el progreso real, no se infla cuando solo se ha
+  // respondido un ejercicio.
+  function estimatePendingTotal() {
+    const cfg = state.config;
+    if (!cfg || !cfg.exercises) return 0;
+    const answered = state.answers;
+    let answeredTotalsSum = 0;
+    let answeredCount = 0;
+    Object.values(answered).forEach(a => {
+      if (a && typeof a.total === 'number' && a.total > 0) {
+        answeredTotalsSum += a.total;
+        answeredCount++;
+      }
+    });
+    // Promedio del "peso" de los ejercicios ya respondidos. Si aún no hay ninguno
+    // respondido, asumimos 1 punto por cada ejercicio pendiente (estimación
+    // conservadora que evita mostrar 10 cuando todavía no se ha hecho nada).
+    const avgTotal = answeredCount > 0 ? (answeredTotalsSum / answeredCount) : 1;
+    let pendingPoints = 0;
+    cfg.exercises.forEach((ex, idx) => {
+      if (ex.type === 'note') return;
+      const id = 'ex_' + idx;
+      if (!answered[id]) pendingPoints += avgTotal;
+    });
+    return pendingPoints;
   }
 
   function getTotalScore() {
@@ -175,7 +249,12 @@
       earned += a.score;
       total += a.total;
     });
-    if (total === 0) return { earned: 0, total: 0, grade: 0 };
+    // Sumar el "peso estimado" de los ejercicios pendientes para que la nota
+    // refleje el avance real del estudiante sobre toda la tarea.
+    const pending = estimatePendingTotal();
+    total += pending;
+
+    if (total === 0) return { earned: 0, total: 0, grade: '0.0', baseGrade: '0.0' };
     const baseGrade = (earned / total) * 10;
     return {
       earned, total,
@@ -193,19 +272,72 @@
     const finalDisplay = document.getElementById('coeduca-final-score-display');
     if (finalDisplay) {
       const s = getTotalScore();
+      const cfg = state.config;
+      const realExercises = (cfg && cfg.exercises ? cfg.exercises : []).filter(e => e.type !== 'note');
+      const answeredCount = Object.keys(state.answers).length;
+      const totalCount = realExercises.length;
+      const allDone = totalCount > 0 && answeredCount >= totalCount;
+      const progressLine = allDone
+        ? `${s.earned} de ${s.total} respuestas correctas`
+        : `Has completado ${answeredCount} de ${totalCount} ejercicios`;
       finalDisplay.innerHTML = `
         <h2>Tu puntaje</h2>
         <span class="score-number">${s.grade} / 10</span>
-        <p>${s.earned} de ${s.total} respuestas correctas
+        <p>${progressLine}
         ${state.extraPoints > 0 ? '+ ' + state.extraPoints.toFixed(1) + ' puntos extra' : ''}</p>
       `;
     }
   }
 
-  function addExtraPoints(pts) {
-    state.extraPoints = Math.min(2, state.extraPoints + pts);
+  // Tabla de puntos extra por resultado del juego.
+  // El juego final SOLO da puntos por el MEJOR resultado obtenido en toda la sesión.
+  // Si el alumno gana y luego pierde, conserva el +1 del win.
+  // Si pierde y luego gana, sube de 0 a +1.
+  // Nunca puede sumar dos veces aunque juegue varias rondas.
+  const GAME_RESULT_POINTS = { win: 1, tie: 0.5, lose: 0 };
+  const GAME_RESULT_RANK   = { win: 3, tie: 2, lose: 1 };
+
+  function setGameResult(result) {
+    // result: 'win' | 'tie' | 'lose'
+    if (!GAME_RESULT_POINTS.hasOwnProperty(result)) return;
+    const prevRank = state.gameResult ? GAME_RESULT_RANK[state.gameResult] : 0;
+    const newRank  = GAME_RESULT_RANK[result];
+    // Solo actualiza si el nuevo resultado es mejor o igual
+    // (igual permite repintar la UI con el mismo valor sin acumular)
+    if (newRank >= prevRank) {
+      state.gameResult = result;
+      state.extraPoints = GAME_RESULT_POINTS[result];
+    }
     saveState();
     updateScoreDisplay();
+  }
+
+  // Compatibilidad con renderers viejos que llamen addExtraPoints directamente.
+  // Convierte el monto en un resultado equivalente.
+  function addExtraPoints(pts) {
+    if (pts >= 1) return setGameResult('win');
+    if (pts > 0)  return setGameResult('tie');
+    return setGameResult('lose');
+  }
+
+  // =====================================================================
+  // VALIDACIÓN DE NIVEL
+  // =====================================================================
+  function isAllowedAtLevel(student) {
+    if (!student) return false;
+    if (student.nie === TEST_NIE) return true; // José Eliseo siempre pasa
+    const lvl = state.config && state.config.level;
+    if (!lvl) return true; // sin filtro
+    const allowed = LEVEL_FILTERS[lvl];
+    if (!allowed) return true; // si el level no es 'A1+' ni 'PreA1', no filtrar
+    return allowed.indexOf(student.grade) >= 0;
+  }
+
+  function getLevelLabel() {
+    const lvl = state.config && state.config.level;
+    if (lvl === 'A1+') return 'Noveno, Primer Año o Segundo Año';
+    if (lvl === 'PreA1') return 'Séptimo u Octavo';
+    return '';
   }
 
   // =====================================================================
@@ -215,21 +347,23 @@
     return new Promise((resolve) => {
       const MAX_PARTNERS = 4;
 
-      // Llamar welcome de Rigo apenas exista y posicionarlo en esquina del modal
+      // Limpiar posición previa de Rigo (por si quedó arrastrado fuera del lado derecho)
+      try { localStorage.removeItem('rigo_pos'); } catch (e) {}
+
+      // Llamar welcome de Rigo apenas exista. Se mantiene en su esquina por defecto
+      // (abajo-derecha). El bocadillo se dibuja hacia arriba-izquierda desde Rigo
+      // (CSS bottom: 110%; right: 10%), así que en abajo-derecha queda visible sin
+      // chocar con el modal centrado.
       const tryWelcome = () => {
         if (global.rigo && typeof global.rigo.welcome === 'function') {
           global.rigo.welcome();
-          // Mover Rigo a la esquina superior izquierda mientras está el login
+          // Forzar la esquina inferior derecha por si una posición previa quedó aplicada inline.
           try {
             const rigoEl = global.rigo;
-            rigoEl.dataset.savedTop = rigoEl.style.top || '';
-            rigoEl.dataset.savedLeft = rigoEl.style.left || '';
-            rigoEl.dataset.savedRight = rigoEl.style.right || '';
-            rigoEl.dataset.savedBottom = rigoEl.style.bottom || '';
-            rigoEl.style.top = '20px';
-            rigoEl.style.left = '20px';
-            rigoEl.style.right = 'auto';
-            rigoEl.style.bottom = 'auto';
+            rigoEl.style.top = 'auto';
+            rigoEl.style.left = 'auto';
+            rigoEl.style.right = '20px';
+            rigoEl.style.bottom = '20px';
             rigoEl.style.zIndex = '10000';
           } catch (e) {}
         } else {
@@ -306,6 +440,14 @@
       function validateMain() {
         const found = lookupNIE(nieInput.value);
         if (found) {
+          if (!isAllowedAtLevel(found)) {
+            mainStudent = null;
+            nieInfo.classList.remove('show');
+            nieError.textContent = 'Este ejercicio es para ' + getLevelLabel();
+            nieError.classList.add('show');
+            submitBtn.disabled = true;
+            return;
+          }
           mainStudent = found;
           nieInfo.innerHTML = '<b>' + escapeHTML(found.name) + '</b><br><small>' + escapeHTML(found.grade) + '</small>';
           nieInfo.classList.add('show');
@@ -315,8 +457,12 @@
         } else {
           mainStudent = null;
           nieInfo.classList.remove('show');
-          if (nieInput.value.trim().length >= 4) nieError.classList.add('show');
-          else nieError.classList.remove('show');
+          if (nieInput.value.trim().length >= 4) {
+            nieError.textContent = 'NIE no encontrado';
+            nieError.classList.add('show');
+          } else {
+            nieError.classList.remove('show');
+          }
           submitBtn.disabled = true;
         }
       }
@@ -373,6 +519,13 @@
           }
           const found = lookupNIE(v);
           if (found) {
+            if (!isAllowedAtLevel(found)) {
+              slot.student = null;
+              info.classList.remove('show');
+              err.textContent = 'Este ejercicio es para ' + getLevelLabel();
+              err.classList.add('show');
+              return;
+            }
             slot.student = found;
             info.innerHTML = '<b>' + escapeHTML(found.name) + '</b><br><small>' + escapeHTML(found.grade) + '</small>';
             info.classList.add('show');
@@ -434,6 +587,15 @@
 
       const finish = () => {
         if (!mainStudent) return;
+        
+        const prev = loadState();
+        if (prev && prev.student && prev.student.nie !== mainStudent.nie) {
+          // Si hay un cambio de estudiante principal, limpiamos el progreso
+          state.answers = {};
+          state.extraPoints = 0;
+          state.gameResult = null;
+        }
+
         state.student = mainStudent;
         // Solo guardamos compañeros válidos
         state.partners = partners.filter(p => p.student).map(p => p.student);
@@ -443,21 +605,14 @@
         if (global.rigo && global.rigo.loginSuccess) {
           global.rigo.loginSuccess(mainStudent.name);
         }
-        // Restaurar Rigo a su posición original tras el login
+        // Mantener Rigo en la esquina inferior derecha tras el login.
         try {
           const rigoEl = global.rigo;
-          if (rigoEl && rigoEl.dataset.savedTop !== undefined) {
-            rigoEl.style.top = rigoEl.dataset.savedTop;
-            rigoEl.style.left = rigoEl.dataset.savedLeft;
-            rigoEl.style.right = rigoEl.dataset.savedRight;
-            rigoEl.style.bottom = rigoEl.dataset.savedBottom;
-            // Si no había guardado nada, regresarlo al default (esquina inferior derecha)
-            if (!rigoEl.style.top && !rigoEl.style.bottom) {
-              rigoEl.style.top = 'auto';
-              rigoEl.style.left = 'auto';
-              rigoEl.style.right = '20px';
-              rigoEl.style.bottom = '20px';
-            }
+          if (rigoEl) {
+            rigoEl.style.top = 'auto';
+            rigoEl.style.left = 'auto';
+            rigoEl.style.right = '20px';
+            rigoEl.style.bottom = '20px';
             rigoEl.style.zIndex = '9999';
           }
         } catch (e) {}
@@ -522,6 +677,10 @@
       <header class="coeduca-header">
         <h1>${escapeHTML(cfg.topic || 'Ejercicio de Inglés')}</h1>
         <p>${escapeHTML(cfg.level || '')} - COEDUCA - Prof. José Eliseo Martínez</p>
+        <div class="coeduca-header-students" id="coeduca-header-students"></div>
+        <button class="coeduca-btn coeduca-btn-info coeduca-add-member-btn" id="coeduca-add-member-btn" type="button">
+          + Agregar miembro
+        </button>
       </header>
       <div id="coeduca-exercises"></div>
       <div id="coeduca-game-section"></div>
@@ -537,6 +696,12 @@
       </div>
     `;
     state.appRoot = appRoot;
+
+    // Mostrar nombres en el header
+    renderHeaderStudents();
+
+    // Botón de agregar miembro durante el ejercicio
+    document.getElementById('coeduca-add-member-btn').addEventListener('click', showAddMemberModal);
 
     // Botón de PDF
     document.getElementById('coeduca-pdf-btn').addEventListener('click', generatePDF);
@@ -571,27 +736,14 @@
       wrap.innerHTML = inner;
       container.appendChild(wrap);
 
-      // Delegar al renderer del tipo
-      const renderer = state.exerciseRegistry[ex.type];
-      if (renderer) {
-        const body = document.getElementById('coeduca-ex-body-' + idx);
-        try {
-          renderer({
-            container: body,
-            exerciseId: 'ex_' + idx,
-            data: getPoolData(ex),
-            config: ex,
-            recordAnswer: (score, total, details) => recordAnswer('ex_' + idx, score, total, details),
-            cheer: () => global.rigo && global.rigo.cheer && global.rigo.cheer(),
-            comfort: () => global.rigo && global.rigo.comfort && global.rigo.comfort()
-          });
-        } catch (err) {
-          console.error('Error rendering exercise', ex.type, err);
-          body.innerHTML = '<p style="color:red">Error: tipo "' + ex.type + '" no disponible</p>';
-        }
+      // Decidir: si ya hay respuesta previa, mostrar resumen con botón retry.
+      // Si no, montar el ejercicio normalmente.
+      const exerciseId = 'ex_' + idx;
+      const previousAnswer = state.answers[exerciseId];
+      if (previousAnswer && previousAnswer.total > 0) {
+        renderCompletedSummary(idx, ex, previousAnswer);
       } else {
-        const body = document.getElementById('coeduca-ex-body-' + idx);
-        body.innerHTML = '<p style="color:red">Tipo de ejercicio desconocido: ' + escapeHTML(ex.type) + '</p>';
+        mountExercise(idx, ex);
       }
     });
 
@@ -599,6 +751,255 @@
     if (cfg.game) {
       renderGame(cfg.game);
     }
+  }
+
+  // =====================================================================
+  // 8b. MOUNT / RE-MOUNT DE UN EJERCICIO
+  // =====================================================================
+  // Monta el ejercicio en su body delegando al renderer registrado.
+  // Se usa tanto en el render inicial como cuando el alumno hace "Volver a intentar".
+  function mountExercise(idx, ex) {
+    const body = document.getElementById('coeduca-ex-body-' + idx);
+    if (!body) return;
+    body.innerHTML = '';
+
+    const renderer = state.exerciseRegistry[ex.type];
+    if (!renderer) {
+      body.innerHTML = '<p style="color:red">Tipo de ejercicio desconocido: ' + escapeHTML(ex.type) + '</p>';
+      return;
+    }
+    try {
+      renderer({
+        container: body,
+        exerciseId: 'ex_' + idx,
+        data: getPoolData(ex),
+        config: ex,
+        recordAnswer: (score, total, details, userAnswer) =>
+          recordAnswer('ex_' + idx, score, total, details, userAnswer),
+        cheer: () => global.rigo && global.rigo.cheer && global.rigo.cheer(),
+        comfort: () => global.rigo && global.rigo.comfort && global.rigo.comfort()
+      });
+    } catch (err) {
+      console.error('Error rendering exercise', ex.type, err);
+      body.innerHTML = '<p style="color:red">Error: tipo "' + ex.type + '" no disponible</p>';
+    }
+  }
+
+  // Pinta un resumen "ya completado" con score y botón para reintentar.
+  // Usa solo CSS vars del framework e inline styles, sin tocar coeduca-core.css.
+  function renderCompletedSummary(idx, ex, ans) {
+    const body = document.getElementById('coeduca-ex-body-' + idx);
+    if (!body) return;
+    const pct = ans.total > 0 ? Math.round((ans.score / ans.total) * 100) : 0;
+    const isPerfect = ans.score === ans.total;
+    const accentBg = isPerfect ? 'var(--coeduca-success, #4CAF50)' : 'var(--coeduca-primary, #FFD700)';
+    const accentColor = isPerfect ? '#fff' : 'var(--coeduca-stroke, #1a1a1a)';
+
+    body.innerHTML = `
+      <div style="
+        padding:18px;
+        background:#FFF8E7;
+        border:3px dashed var(--coeduca-stroke, #1a1a1a);
+        border-radius:12px;
+        text-align:center;
+      ">
+        <div style="
+          display:inline-block;
+          background:${accentBg};
+          color:${accentColor};
+          border:3px solid var(--coeduca-stroke, #1a1a1a);
+          border-radius:50px;
+          padding:6px 18px;
+          font-weight:900;
+          font-size:13px;
+          letter-spacing:1px;
+          text-transform:uppercase;
+          box-shadow:3px 3px 0 var(--coeduca-stroke, #1a1a1a);
+          margin-bottom:10px;
+        ">
+          ${isPerfect ? 'COMPLETADO PERFECTO' : 'YA COMPLETADO'}
+        </div>
+        <div style="font-size:32px; font-weight:900; color:var(--coeduca-stroke, #1a1a1a); margin:6px 0;">
+          ${ans.score} / ${ans.total}
+        </div>
+        <div style="font-size:14px; font-weight:bold; color:var(--coeduca-stroke, #1a1a1a); margin-bottom:14px;">
+          ${pct}% de aciertos
+        </div>
+        <button type="button"
+          class="coeduca-btn coeduca-btn-info"
+          data-retry-idx="${idx}"
+          style="margin-top:6px;">
+          Volver a intentar
+        </button>
+      </div>
+    `;
+
+    const retryBtn = body.querySelector('[data-retry-idx]');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        retryExercise(idx);
+      });
+    }
+  }
+
+  // Borra la respuesta guardada de un ejercicio y lo vuelve a montar limpio.
+  function retryExercise(idx) {
+    const exId = 'ex_' + idx;
+    delete state.answers[exId];
+    saveState();
+    updateScoreDisplay();
+
+    const cfg = state.config;
+    const ex = (cfg.exercises || [])[idx];
+    if (ex) mountExercise(idx, ex);
+  }
+
+  // =====================================================================
+  // HEADER: nombres de estudiantes + agregar miembro durante el ejercicio
+  // =====================================================================
+  function renderHeaderStudents() {
+    const el = document.getElementById('coeduca-header-students');
+    if (!el) return;
+    const stu = state.student;
+    const partners = state.partners || [];
+    if (!stu) { el.textContent = ''; return; }
+
+    const names = [stu.name].concat(partners.map(p => p.name));
+    
+    // MEJORA 2: Extraer grados únicos
+    const uniqueGrades = [...new Set([stu.grade].concat(partners.map(p => p.grade)))];
+    const gradesHtml = uniqueGrades.map(g => 
+      `<span class="coeduca-header-student-pill" style="background:var(--coeduca-info)">${escapeHTML(g)}</span>`
+    ).join(' ');
+
+    el.innerHTML = `
+      <div style="margin-bottom: 8px;">
+        <span class="coeduca-header-students-label">Grado:</span> ${gradesHtml}
+      </div>
+      <div>
+        <span class="coeduca-header-students-label">Trabajo de:</span> 
+        ${names.map(n => '<span class="coeduca-header-student-pill">' + escapeHTML(n) + '</span>').join(' ')}
+      </div>
+    `;
+    // Si ya estamos en el límite, deshabilitar el botón de agregar
+    const addBtn = document.getElementById('coeduca-add-member-btn');
+    if (addBtn) {
+      const atMax = partners.length >= 4;
+      addBtn.disabled = atMax;
+      addBtn.style.opacity = atMax ? '0.5' : '1';
+      addBtn.style.cursor = atMax ? 'not-allowed' : 'pointer';
+      if (atMax) addBtn.textContent = 'Equipo lleno (4/4)';
+      else addBtn.textContent = '+ Agregar miembro' + (partners.length > 0 ? ' (' + partners.length + '/4)' : '');
+    }
+  }
+
+  function showAddMemberModal() {
+    if ((state.partners || []).length >= 4) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'coeduca-login-overlay';
+    overlay.innerHTML = `
+      <div class="coeduca-login-modal" style="max-width: 400px;">
+        <div class="coeduca-login-header">
+          <div class="coeduca-login-badge">COEDUCA</div>
+          <h2 style="font-size: 26px;">+ MIEMBRO</h2>
+          <p>Ingresa el NIE del compañero que llegó tarde</p>
+        </div>
+        <div class="coeduca-login-modal-scroll" style="padding: 18px 24px 8px;">
+          <div class="coeduca-login-field">
+            <label><span class="coeduca-login-icon">+</span> NIE del compañero</label>
+            <input type="text" id="coeduca-add-member-nie" class="coeduca-input coeduca-input-allow-copy"
+                   inputmode="numeric" autocomplete="off" placeholder="Ej. 12379">
+            <div class="coeduca-login-info" id="coeduca-add-member-info"></div>
+            <div class="coeduca-login-error" id="coeduca-add-member-error">NIE no encontrado</div>
+          </div>
+        </div>
+        <div class="coeduca-login-actions">
+          <button class="coeduca-btn" id="coeduca-add-member-cancel" type="button">Cancelar</button>
+          <button class="coeduca-btn coeduca-btn-success" id="coeduca-add-member-ok" disabled type="button">Agregar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const inp = overlay.querySelector('#coeduca-add-member-nie');
+    const info = overlay.querySelector('#coeduca-add-member-info');
+    const err = overlay.querySelector('#coeduca-add-member-error');
+    const okBtn = overlay.querySelector('#coeduca-add-member-ok');
+    const cancelBtn = overlay.querySelector('#coeduca-add-member-cancel');
+    let candidate = null;
+
+    function lookup(nie) {
+      let DB = null;
+      try { DB = global.STUDENTS; } catch (e) {}
+      if (!DB) { try { DB = STUDENTS; } catch (e) {} }
+      if (!DB) return null;
+      const clean = String(nie || '').trim();
+      return clean && DB[clean] ? { nie: clean, ...DB[clean] } : null;
+    }
+
+    function validate() {
+      const v = inp.value.trim();
+      candidate = null;
+      okBtn.disabled = true;
+      if (!v) { info.classList.remove('show'); err.classList.remove('show'); return; }
+      // Duplicados
+      if (state.student && state.student.nie === v) {
+        info.classList.remove('show');
+        err.textContent = 'Ya está como estudiante principal';
+        err.classList.add('show'); return;
+      }
+      if ((state.partners || []).some(p => p.nie === v)) {
+        info.classList.remove('show');
+        err.textContent = 'Ya está agregado al equipo';
+        err.classList.add('show'); return;
+      }
+      const found = lookup(v);
+      if (!found) {
+        info.classList.remove('show');
+        if (v.length >= 4) { err.textContent = 'NIE no encontrado'; err.classList.add('show'); }
+        else err.classList.remove('show');
+        return;
+      }
+      if (!isAllowedAtLevel(found)) {
+        info.classList.remove('show');
+        err.textContent = 'Este ejercicio es para ' + getLevelLabel();
+        err.classList.add('show'); return;
+      }
+      candidate = found;
+      info.innerHTML = '<b>' + escapeHTML(found.name) + '</b><br><small>' + escapeHTML(found.grade) + '</small>';
+      info.classList.add('show');
+      err.classList.remove('show');
+      okBtn.disabled = false;
+    }
+
+    inp.addEventListener('input', validate);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !okBtn.disabled) okBtn.click();
+      if (e.key === 'Escape') cancelBtn.click();
+    });
+    cancelBtn.addEventListener('click', () => {
+      overlay.style.transition = 'opacity 0.2s';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 200);
+    });
+    okBtn.addEventListener('click', () => {
+      if (!candidate) return;
+      state.partners = state.partners || [];
+      state.partners.push(candidate);
+      // Compatibilidad: state.partner = primer compañero
+      if (!state.partner) state.partner = candidate;
+      saveState();
+      renderHeaderStudents();
+      if (global.rigo && global.rigo.say) {
+        global.rigo.say('¡Bienvenido ' + candidate.name.split(' ')[0] + '!', 3000);
+      }
+      overlay.style.transition = 'opacity 0.2s';
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 200);
+    });
+
+    setTimeout(() => inp.focus(), 200);
   }
 
   function renderAudioPlayer(src, idx) {
@@ -629,18 +1030,31 @@
           container: document.getElementById('coeduca-game-body'),
           config: gameCfg,
           onWin: () => {
+            const wasWin = state.gameResult === 'win';
             if (global.rigo) global.rigo.setEmotion && global.rigo.setEmotion('excited');
-            if (global.rigo) global.rigo.say && global.rigo.say('Felicidades, eres bueno en este juego, ten 1 punto extra', 4500);
-            addExtraPoints(1);
+            if (global.rigo) global.rigo.say && global.rigo.say(
+              wasWin
+                ? 'Sigues siendo bueno en este juego, mantienes tu punto extra'
+                : 'Felicidades, eres bueno en este juego, ten 1 punto extra',
+              4500
+            );
+            setGameResult('win');
           },
           onTie: () => {
+            const hadWin = state.gameResult === 'win';
             if (global.rigo) global.rigo.setEmotion && global.rigo.setEmotion('neutral');
-            if (global.rigo) global.rigo.say && global.rigo.say('Estamos a mano, ten 0.5 extra para tu nota', 4500);
-            addExtraPoints(0.5);
+            if (global.rigo) global.rigo.say && global.rigo.say(
+              hadWin
+                ? 'Estuvo cerca, pero conservas tu punto extra anterior'
+                : 'Estamos a mano, ten 0.5 extra para tu nota',
+              4500
+            );
+            setGameResult('tie');
           },
           onLose: () => {
             if (global.rigo) global.rigo.setEmotion && global.rigo.setEmotion('sad');
-            if (global.rigo) global.rigo.say && global.rigo.say('Oops, más suerte para la próxima.', 4500);
+            if (global.rigo) global.rigo.say && global.rigo.say('Oops, mas suerte para la proxima.', 4500);
+            setGameResult('lose');
           }
         });
       } catch (err) {
@@ -677,7 +1091,7 @@
   }
 
   // =====================================================================
-  // 10. PDF GENERATION (con fix iOS)
+  // 10. PDF GENERATION (Multi-Diseño con fix iOS)
   // =====================================================================
   function generatePDF() {
     if (!global.jspdf || !global.jspdf.jsPDF) {
@@ -688,6 +1102,8 @@
     const doc = new jsPDF({ unit: 'mm', format: 'letter' });
 
     const cfg = state.config;
+    const design = cfg.pdfDesign || 'PopArt';
+
     const stu = state.student || { nie: '-', name: '-', grade: '-' };
     const partners = (state.partners && state.partners.length)
       ? state.partners
@@ -695,121 +1111,369 @@
     const score = getTotalScore();
     const today = new Date().toLocaleDateString('es-SV');
 
-    let y = 15;
-    const left = 15;
-    const right = 200;
+    // ----------------------------------------------------------------
+    // PALETAS
+    // Cada tema define:
+    //   primary   - color principal (fondos de secciones, circulos)
+    //   accent    - color de acento (nota final, badges de juego)
+    //   dark      - texto oscuro garantizado (siempre legible sobre blanco/bg)
+    //   onPrimary - texto sobre fondo primary
+    //   onAccent  - texto sobre fondo accent
+    //   bg        - fondo de tarjetas neutras
+    //   divider   - linea separadora de ejercicios
+    //   useStrokes - sombra offset
+    //   font
+    // ----------------------------------------------------------------
+    const themes = {
+      'PopArt': {
+        primary:   [255, 215, 0],
+        accent:    [255, 107, 157],
+        dark:      [26,  26,  26],
+        onPrimary: [26,  26,  26],
+        onAccent:  [255, 255, 255],
+        bg:        [255, 248, 231],
+        divider:   [200, 190, 170],
+        useStrokes: true,
+        font: 'helvetica'
+      },
+      'PopArtVibrant': {
+        primary:   [30,  30,  30],
+        accent:    [0,   220, 150],
+        dark:      [10,  10,  10],
+        onPrimary: [0,   220, 150],
+        onAccent:  [10,  10,  10],
+        bg:        [245, 245, 245],
+        divider:   [180, 180, 180],
+        useStrokes: true,
+        font: 'helvetica'
+      },
+      'Colorido': {
+        primary:   [255, 87,  34],
+        accent:    [33,  150, 243],
+        dark:      [26,  26,  26],
+        onPrimary: [255, 255, 255],
+        onAccent:  [255, 255, 255],
+        bg:        [255, 255, 255],
+        divider:   [220, 200, 190],
+        useStrokes: false,
+        font: 'helvetica'
+      },
+      'Pastel': {
+        primary:   [179, 229, 252],
+        accent:    [248, 187, 208],
+        dark:      [50,  50,  80],
+        onPrimary: [50,  50,  80],
+        onAccent:  [80,  40,  60],
+        bg:        [255, 255, 255],
+        divider:   [210, 210, 230],
+        useStrokes: false,
+        font: 'helvetica'
+      },
+      'HollyHobbie': {
+        primary:   [143, 151, 121],
+        accent:    [212, 165, 165],
+        dark:      [60,  40,  20],
+        onPrimary: [255, 255, 255],
+        onAccent:  [60,  40,  20],
+        bg:        [245, 245, 220],
+        divider:   [180, 160, 130],
+        useStrokes: true,
+        font: 'times'
+      }
+    };
 
-    // Título
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(sanitizeForPDF(cfg.topic || 'Ejercicio de Ingles'), 105, y, { align: 'center' });
-    y += 7;
+    const T = themes[design] || themes['PopArt'];
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('COEDUCA - Prof. Jose Eliseo Martinez', 105, y, { align: 'center' });
-    y += 8;
+    // Colores semanticos fijos
+    const S = {
+      white:     [255, 255, 255],
+      green:     [56,  161, 62],
+      red:       [210, 50,  50],
+      amber:     [230, 160, 30],
+      lightGray: [238, 238, 238],
+      gray:      [130, 130, 130],
+      darkGray:  [60,  60,  60]
+    };
 
-    // Puntos extra (esquina superior derecha)
-    if (state.extraPoints > 0) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(230, 57, 70);
-      doc.text('+' + state.extraPoints.toFixed(1) + ' pts extra', right, 15, { align: 'right' });
-      doc.setTextColor(0, 0, 0);
+    // ----------------------------------------------------------------
+    // HELPERS
+    // ----------------------------------------------------------------
+    function fillBox(x, y, w, h, color) {
+      doc.setFillColor(color[0], color[1], color[2]);
+      doc.rect(x, y, w, h, 'F');
+    }
+    function borderedBox(x, y, w, h, fill, borderColor, lineW) {
+      doc.setFillColor(fill[0], fill[1], fill[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(lineW || 0.5);
+      doc.rect(x, y, w, h, 'FD');
+    }
+    function shadowBox(x, y, w, h, fill) {
+      // Sombra offset solo si el tema la usa
+      if (T.useStrokes) {
+        doc.setFillColor(T.dark[0], T.dark[1], T.dark[2]);
+        doc.rect(x + 1.5, y + 1.5, w, h, 'F');
+      }
+      doc.setFillColor(fill[0], fill[1], fill[2]);
+      doc.rect(x, y, w, h, 'F');
+    }
+    function shadowBorderedBox(x, y, w, h, fill, borderColor, lineW) {
+      if (T.useStrokes) {
+        doc.setFillColor(T.dark[0], T.dark[1], T.dark[2]);
+        doc.rect(x + 1.5, y + 1.5, w, h, 'F');
+      }
+      borderedBox(x, y, w, h, fill, borderColor, lineW);
+    }
+    function setText(color, style, size) {
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.setFont(T.font, style || 'normal');
+      doc.setFontSize(size || 10);
+    }
+    function hline(x1, x2, yPos, color, lineW) {
+      doc.setDrawColor(color[0], color[1], color[2]);
+      doc.setLineWidth(lineW || 0.3);
+      doc.line(x1, yPos, x2, yPos);
     }
 
-    // Encabezado tabla (altura dinámica según número de compañeros)
-    const headerLines = [
-      ['Profesor:', 'Jose Eliseo Martinez', 'Escuela:', 'COEDUCA'],
-      ['Seccion:', 'A', 'Nivel:', sanitizeForPDF(cfg.level || '-')],
-      ['Tema:', sanitizeForPDF(cfg.topic || '-'), 'Fecha:', today],
-      ['NIE:', sanitizeForPDF(stu.nie), 'Nombre:', sanitizeForPDF(stu.name)],
-      ['Grado:', sanitizeForPDF(stu.grade), '', '']
+    // Pagina letter
+    const PW = 215.9;
+    const PH = 279.4;
+    const M  = 13;
+    const right = PW - M;
+    const contentW = right - M;
+
+    // ----------------------------------------------------------------
+    // SECCION 1: FRANJA DE CABECERA
+    // Tira de color primary full-width con titulo centrado.
+    // Debajo, linea fina con institucion + fecha.
+    // ----------------------------------------------------------------
+    const headerH = 22;
+    shadowBox(0, 0, PW, headerH, T.primary);
+
+    setText(T.onPrimary, 'bold', 18);
+    doc.text(
+      sanitizeForPDF(cfg.topic || 'Ejercicio de Ingles').toUpperCase(),
+      PW / 2, 14, { align: 'center' }
+    );
+
+    // Franja fina debajo del header para subtitulo
+    fillBox(0, headerH, PW, 7, T.dark);
+    setText(S.white, 'normal', 8);
+    doc.text('COEDUCA  |  Prof. Jose Eliseo Martinez  |  ' + today, PW / 2, headerH + 5, { align: 'center' });
+
+    let y = headerH + 14;
+
+    // ----------------------------------------------------------------
+    // SECCION 2: HERO - NOTA FINAL
+    // Caja centrada ancha con la nota en grande.
+    // Debajo, tres pills de estadisticas en fila.
+    // ----------------------------------------------------------------
+    const heroW = contentW;
+    const heroH = 36;
+    const heroX = M;
+
+    shadowBorderedBox(heroX, y, heroW, heroH, T.bg, T.primary, 1);
+
+    // Etiqueta "NOTA FINAL" - pequena, sobre el numero
+    setText(T.dark, 'bold', 8);
+    doc.text('NOTA FINAL', PW / 2, y + 9, { align: 'center' });
+
+    // Numero grande centrado
+    setText(T.accent, 'bold', 40);
+    doc.text(String(score.grade), PW / 2, y + 27, { align: 'center' });
+
+    // "/10" pequeno alineado a la derecha del numero grande
+    // Calcular posicion aproximada: el numero esta centrado, lo ponemos un poco a la derecha
+    const gradeStrW = doc.getStringUnitWidth(String(score.grade)) * 40 / doc.internal.scaleFactor;
+    setText(T.dark, 'normal', 10);
+    doc.text('/ 10', PW / 2 + gradeStrW / 2 + 3, y + 27, { align: 'left' });
+
+    y += heroH + 5;
+
+    // --- Pills de estadisticas (fila de 2 o 3 segun si hay extra) ---
+    const hasExtra = state.extraPoints > 0;
+    const pillCount = hasExtra ? 3 : 2;
+    const pillGap = 4;
+    const pillW = (contentW - pillGap * (pillCount - 1)) / pillCount;
+    const pillH = 11;
+
+    const pills = [
+      { label: 'ACIERTOS', value: score.earned + ' de ' + score.total }
     ];
-    partners.forEach((p, i) => {
-      headerLines.push([
-        'NIE compa ' + (i + 1) + ':', sanitizeForPDF(p.nie),
-        'Compa ' + (i + 1) + ':', sanitizeForPDF(p.name)
-      ]);
+    if (hasExtra) {
+      pills.push({ label: 'NOTA BASE', value: score.baseGrade + ' / 10' });
+      pills.push({ label: 'PUNTOS EXTRA', value: '+' + state.extraPoints.toFixed(1), highlight: true });
+    } else {
+      pills.push({ label: 'NOTA BASE', value: score.baseGrade + ' / 10' });
+    }
+
+    pills.forEach(function(pill, i) {
+      const px = M + i * (pillW + pillGap);
+      const fillColor = pill.highlight ? T.accent : T.primary;
+      const textColor = pill.highlight ? T.onAccent : T.onPrimary;
+      shadowBox(px, y, pillW, pillH, fillColor);
+      setText(textColor, 'bold', 7);
+      doc.text(pill.label, px + pillW / 2, y + 4, { align: 'center' });
+      setText(textColor, 'bold', 9);
+      doc.text(pill.value, px + pillW / 2, y + 9, { align: 'center' });
     });
-    const headerHeight = headerLines.length * 7 + 4;
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setDrawColor(0, 0, 0);
-    doc.rect(left, y, right - left, headerHeight);
+    y += pillH + 10;
 
-    doc.setFontSize(9);
-    let yy = y + 5;
-    headerLines.forEach(row => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(row[0], left + 2, yy);
-      doc.setFont('helvetica', 'normal');
-      doc.text(row[1] || '', left + 28, yy);
-      doc.setFont('helvetica', 'bold');
-      doc.text(row[2] || '', 110, yy);
-      doc.setFont('helvetica', 'normal');
-      doc.text(row[3] || '', 130, yy);
-      yy += 7;
-    });
-    y = yy + 4;
+    // ----------------------------------------------------------------
+    // SECCION 3: TARJETA DE EQUIPO
+    // Fondo bg, borde izquierdo de color primary como acento.
+    // ----------------------------------------------------------------
+    const teamRows = 2 + partners.length + (cfg.level ? 0 : 0);
+    const teamH = 10 + teamRows * 7 + 4;
 
-    // Calificación
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.text('Calificacion: ' + score.grade + ' / 10', left, y);
-    y += 6;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Aciertos: ' + score.earned + ' / ' + score.total +
-             '  |  Nota base: ' + score.baseGrade +
-             '  |  Pts extra: +' + state.extraPoints.toFixed(1), left, y);
-    y += 8;
+    borderedBox(M, y, contentW, teamH, T.bg, T.divider, 0.4);
+    // Borde izquierdo grueso como acento de color
+    fillBox(M, y, 3, teamH, T.primary);
 
-    // Detalle por ejercicio
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.text('Detalle por ejercicio:', left, y);
-    y += 6;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
+    // Label de seccion pegado al borde izquierdo, dentro del box
+    setText(T.dark, 'bold', 8);
+    doc.text('EQUIPO', M + 8, y + 6.5);
+
+    // Linea divisoria bajo el label
+    hline(M + 3, M + contentW, y + 8.5, T.divider, 0.3);
+
+    let yy = y + 13;
+    const col1 = M + 8;
+    const col2 = M + 38;
+
+    setText(T.dark, 'bold', 9);
+    doc.text('Estudiante:', col1, yy);
+    setText(S.darkGray, 'normal', 9);
+    doc.text(sanitizeForPDF(stu.name) + '  (NIE: ' + sanitizeForPDF(stu.nie) + ')', col2, yy);
+    yy += 7;
+
+    setText(T.dark, 'bold', 9);
+    doc.text('Grado:', col1, yy);
+    setText(S.darkGray, 'normal', 9);
+    var gradeLevel = sanitizeForPDF(stu.grade);
+    if (cfg.level) gradeLevel += '   Nivel: ' + sanitizeForPDF(cfg.level);
+    doc.text(gradeLevel, col2, yy);
+    yy += 7;
+
+    if (partners.length === 0) {
+      setText(S.gray, 'italic', 9);
+      doc.text('Trabajo individual', col1, yy);
+    } else {
+      partners.forEach(function(p, i) {
+        setText(T.dark, 'bold', 9);
+        doc.text('Compañero ' + (i + 1) + ':', col1, yy);
+        setText(S.darkGray, 'normal', 9);
+        doc.text(sanitizeForPDF(p.name) + '  (NIE: ' + sanitizeForPDF(p.nie) + ')', col2, yy);
+        yy += 7;
+      });
+    }
+
+    y += teamH + 10;
+
+    // ----------------------------------------------------------------
+    // SECCION 4: DETALLE POR EJERCICIO
+    // Cabecera de seccion. Cada ejercicio en fila con linea divisoria.
+    // ----------------------------------------------------------------
+
+    // Cabecera de seccion
+    fillBox(M, y, contentW, 8, T.primary);
+    setText(T.onPrimary, 'bold', 9);
+    doc.text('DETALLE POR EJERCICIO', M + 5, y + 5.5);
+    y += 12;
 
     let exNum = 0;
-    (cfg.exercises || []).forEach((ex, idx) => {
+    (cfg.exercises || []).forEach(function(ex, idx) {
       if (ex.type === 'note') return;
       exNum++;
       const ans = state.answers['ex_' + idx];
       const title = sanitizeForPDF(ex.title || ('Ejercicio ' + exNum));
-      const result = ans ? (ans.score + '/' + ans.total) : 'sin completar';
-      if (y > 260) { doc.addPage(); y = 15; }
-      doc.setFont('helvetica', 'bold');
-      doc.text(exNum + '. ' + title, left, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(result, right - 20, y);
+
+      let isNewPage = false;
+      if (y > PH - 35) { doc.addPage(); y = 15; isNewPage = true; }
+
+      // Linea divisoria entre ejercicios (más arriba y sin estorbar al cambiar de página)
+      if (exNum > 1 && !isNewPage) {
+        hline(M, right, y - 5, T.divider, 0.25);
+      }
+
+      // Pill numerado (circulo pequeño)
+      doc.setFillColor(T.primary[0], T.primary[1], T.primary[2]);
+      if (T.useStrokes) {
+        doc.setDrawColor(T.dark[0], T.dark[1], T.dark[2]);
+        doc.setLineWidth(0.4);
+        doc.circle(M + 4, y - 0.8, 3, 'FD');
+      } else {
+        doc.circle(M + 4, y - 0.8, 3, 'F');
+      }
+      setText(T.onPrimary, 'bold', 8);
+      doc.text(String(exNum), M + 4, y + 0.5, { align: 'center' });
+
+      // Titulo del ejercicio
+      setText(T.dark, 'bold', 10);
+      doc.text(title, M + 10, y);
+
+      // Badge resultado (esquina derecha)
+      let badgeColor = S.lightGray;
+      let badgeText  = 'pendiente';
+      let badgeTC    = S.gray;
+
+      if (ans) {
+        const pct = ans.total > 0 ? ans.score / ans.total : 0;
+        badgeText = ans.score + ' / ' + ans.total;
+        if (pct >= 0.7)      { badgeColor = S.green;  badgeTC = S.white; }
+        else if (pct >= 0.4) { badgeColor = S.amber;  badgeTC = T.dark; }
+        else                 { badgeColor = S.red;    badgeTC = S.white; }
+      }
+
+      const bw = 28, bh = 6;
+      const bx = right - bw;
+      const by = y - 4.5;
+      fillBox(bx, by, bw, bh, badgeColor);
+      setText(badgeTC, 'bold', 8);
+      doc.text(badgeText, bx + bw / 2, by + 4.2, { align: 'center' });
+
       y += 5;
 
-      // Detalles si existen
-      if (ans && ans.details && Array.isArray(ans.details)) {
-        ans.details.forEach(d => {
-          if (y > 270) { doc.addPage(); y = 15; }
-          const line = '   ' + sanitizeForPDF(d);
-          const split = doc.splitTextToSize(line, right - left - 5);
-          doc.text(split, left, y);
-          y += split.length * 4;
+      // Detalles del ejercicio
+      if (ans && ans.details && Array.isArray(ans.details) && ans.details.length) {
+        setText(S.gray, 'normal', 8);
+        ans.details.forEach(function(d) {
+          if (y > PH - 20) { doc.addPage(); y = 15; }
+          const line = '  ' + sanitizeForPDF(d);
+          const split = doc.splitTextToSize(line, contentW - 10);
+          doc.text(split, M + 9, y);
+          y += split.length * 3.6;
         });
-        y += 2;
+        y += 1;
       }
+      y += 8;
     });
 
+    // ----------------------------------------------------------------
+    // SECCION 5: JUEGO FINAL (si existe)
+    // Muestra el tipo de juego. Los puntos extra ya aparecen en las
+    // pills de la seccion 2, no se repiten aqui.
+    // ----------------------------------------------------------------
     if (cfg.game) {
-      if (y > 270) { doc.addPage(); y = 15; }
-      doc.setFont('helvetica', 'bold');
-      doc.text('Juego final: ' + sanitizeForPDF(cfg.game.type), left, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text('+' + state.extraPoints.toFixed(1) + ' pts', right - 20, y);
-      y += 6;
+      if (y > PH - 25) { doc.addPage(); y = 15; }
+      y += 4;
+      borderedBox(M, y, contentW, 9, T.bg, T.accent, 0.8);
+      fillBox(M, y, 3, 9, T.accent);
+      setText(T.dark, 'bold', 9);
+      doc.text('JUEGO FINAL:', M + 8, y + 6);
+      setText(S.darkGray, 'normal', 9);
+      doc.text(sanitizeForPDF(cfg.game.type).toUpperCase(), M + 42, y + 6);
+      y += 13;
     }
+
+    // ----------------------------------------------------------------
+    // FOOTER
+    // ----------------------------------------------------------------
+    const footerY = PH - 8;
+    hline(M, right, footerY - 4, T.divider, 0.3);
+    setText(S.gray, 'italic', 7);
+    doc.text('COEDUCA - Reporte generado automaticamente', PW / 2, footerY, { align: 'center' });
 
     // FIX iOS: usar blob + URL en lugar de doc.save()
     try {
@@ -823,7 +1487,7 @@
       a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => {
+      setTimeout(function() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 1500);
@@ -973,6 +1637,7 @@
     escapeHTML,
     makeDraggable,
     addExtraPoints,
+    setGameResult,
     recordAnswer,
 
     registerExercise(type, renderer) {
@@ -988,6 +1653,7 @@
         (config.id || (config.topic || 'page').replace(/\W+/g, '_').toLowerCase()) + '_';
 
       ensureNoTranslate();
+      setupBfCacheGuard();
       setupAntiCopy();
       applyTheme(config.colors);
       pickPoolVersion();
@@ -997,6 +1663,7 @@
       if (prev) {
         state.answers = prev.answers || {};
         state.extraPoints = prev.extraPoints || 0;
+        state.gameResult = prev.gameResult || null;
       }
 
       // Esperar DOM
@@ -1018,6 +1685,21 @@
       try { localStorage.removeItem(state.storageKey + 'state'); } catch (e) {}
       try { localStorage.removeItem(state.storageKey + 'pool'); } catch (e) {}
       location.reload();
+    },
+
+    // Borra la respuesta guardada de un ejercicio (por exerciseId tipo 'ex_3')
+    // y lo vuelve a montar limpio. También se llama internamente desde el
+    // botón "Volver a intentar".
+    retryExercise(exerciseIdOrIdx) {
+      let idx;
+      if (typeof exerciseIdOrIdx === 'number') {
+        idx = exerciseIdOrIdx;
+      } else {
+        const m = String(exerciseIdOrIdx).match(/^ex_(\d+)$/);
+        if (!m) return;
+        idx = parseInt(m[1], 10);
+      }
+      retryExercise(idx);
     }
   };
 

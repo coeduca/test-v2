@@ -5,111 +5,185 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="google" content="notranslate">
   <meta http-equiv="Content-Language" content="es">
-  <title>Verb To Be - Séptimo</title>
+  <title>Numbers 21 to 100 - Septimo y Octavo</title>
   <link rel="stylesheet" href="coeduca-core.css">
+  <link rel="icon" href="favicon.png" type="image/png">
 </head>
 <body>
-
   <div id="app"></div>
-
-  <!-- Scripts en orden -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="students.js"></script>
   <script src="rigo.js"></script>
   <script src="coeduca-core.js"></script>
   <script src="coeduca-exercises.js"></script>
   <script src="coeduca-games.js"></script>
-
   <rigo-mascot></rigo-mascot>
-
   <script>
-    COEDUCA.init({
-      container: '#app',
-      topic: 'Verb To Be',
-      level: 'Séptimo',
-      colors: {
-        primary: '#FFD700',
-        accent: '#FF6B9D',
-        bg: '#FFF8E7'
+  COEDUCA.init({
+    container: '#app',
+    topic: 'Simple Past',
+    level: 'A1+', // Filtro para: Noveno, Primer Año, Segundo Año
+    pdfDesign: 'PopArt',
+    colors: {
+      primary: '#4CAF50', // Verde
+      accent: '#FFD700',  // Amarillo
+      bg: '#E1F5FE'       // Celeste
+    },
+    exercises: [
+      // 1. WORDSEARCH: Verbos regulares e irregulares
+      {
+        type: 'wordsearch',
+        title: '1. Verbs in the Past',
+        instruction: 'Find the regular and irregular past tense verbs in the wordsearch.',
+        dataA: { words: ['PLAYED', 'WENT', 'SAW', 'ATE', 'STUDIED', 'COOKED', 'STAYED', 'SWAM', 'TRIED', 'AGREED'] },
+        dataB: { words: ['BOUGHT', 'LIKED', 'DRANK', 'READ', 'SLEPT', 'DREW', 'TALKED', 'DREAMED', 'SMILED', 'CRIED'] }
       },
-      exercises: [
-        { type: 'note', html: '<p><b>Bienvenido.</b> Hoy practicamos el verbo <i>to be</i>. Lee con calma cada ejercicio.</p>' },
-
-        {
-          type: 'wordsearch',
-          title: 'Find the forms of "to be"',
-          instruction: 'Encuentra estas formas en la sopa de letras.',
-          dataA: { words: ['AM', 'IS', 'ARE', 'WAS', 'WERE'], gridSize: 10 },
-          dataB: { words: ['BEEN', 'BEING', 'IS', 'ARE', 'AM'], gridSize: 10 }
-        },
-
-        {
-          type: 'fillblank',
-          title: 'Complete with am / is / are',
-          instruction: 'Escribe la forma correcta del verbo.',
-          dataA: [
-            { text: 'I ___ a student.', answer: 'am' },
-            { text: 'She ___ happy.', answer: 'is' },
-            { text: 'They ___ from El Salvador.', answer: 'are' },
-            { text: 'You ___ tall.', answer: 'are' },
-            { text: 'It ___ a cat.', answer: 'is' }
-          ],
-          dataB: [
-            { text: 'We ___ friends.', answer: 'are' },
-            { text: 'He ___ tired.', answer: 'is' },
-            { text: 'I ___ ready.', answer: 'am' },
-            { text: 'They ___ in school.', answer: 'are' },
-            { text: 'She ___ a teacher.', answer: 'is' }
+      
+      // 2. MATCHIMAGE: Arrastrar texto a la imagen correspondiente
+      {
+        type: 'matchimage',
+        title: '2. What happened?',
+        instruction: 'Drag the correct past tense verb to match the image.',
+        dataA: [
+          { word: 'Washed', image: 'files/boy-washing-dishes.webp' },
+          { word: 'Cooked', image: 'files/man-chef-cooking.avif' },
+          { word: 'Broke', image: 'files/a-broken-bone.jpg' },
+          { word: 'Thought', image: 'files/woman-thinking.avif' }
+        ],
+        dataB: [
+          { word: 'Washed', image: 'files/girl-washing-dishes.png' },
+          { word: 'Threw', image: 'files/a-man-playing-about-to-throw-a-ball.webp' },
+          { word: 'Played', image: 'files/child-playing-guitar.avif' },
+          { word: 'Flew', image: 'files/a-fly-flying.jpg' }
+        ]
+      },
+      
+      // 3. DRAGBANK: Completar 6 oraciones
+      {
+        type: 'dragbank',
+        title: '3. Complete the sentences',
+        instruction: 'Drag the correct verb into the blanks.',
+        dataA: {
+          bank: ['did', 'was'], // Distractores
+          sentences: [
+            { text: 'I ___ to the mall yesterday.', answer: 'went' },
+            { text: 'She ___ a delicious pizza.', answer: 'ate' },
+            { text: 'We ___ soccer after school.', answer: 'played' },
+            { text: 'They ___ see the movie.', answer: "didn't" },
+            { text: 'He ___ a new phone.', answer: 'bought' },
+            { text: 'I ___ my homework at night.', answer: 'did' }
           ]
         },
-
-        {
-          type: 'multiplechoice',
-          title: 'Choose the correct option',
-          dataA: [
-            { q: '___ you a doctor?', options: ['Are', 'Is', 'Am'], answer: 0 },
-            { q: 'My mother ___ a nurse.', options: ['am', 'is', 'are'], answer: 1 },
-            { q: 'They ___ at home.', options: ['is', 'am', 'are'], answer: 2 }
-          ],
-          dataB: [
-            { q: 'I ___ tired today.', options: ['am', 'is', 'are'], answer: 0 },
-            { q: 'The cat ___ on the table.', options: ['are', 'is', 'am'], answer: 1 },
-            { q: 'We ___ from El Salvador.', options: ['is', 'am', 'are'], answer: 2 }
-          ]
-        },
-
-        {
-          type: 'truefalse',
-          title: 'True or False',
-          dataA: [
-            { statement: '"She is happy" is correct grammar.', answer: true },
-            { statement: '"They is friends" is correct grammar.', answer: false },
-            { statement: '"I am a student" is correct grammar.', answer: true }
-          ],
-          dataB: [
-            { statement: '"We are tall" is correct grammar.', answer: true },
-            { statement: '"He are tired" is correct grammar.', answer: false },
-            { statement: '"It is a dog" is correct grammar.', answer: true }
-          ]
-        },
-
-        {
-          type: 'matchimage',
-          title: 'Match the family',
-          dataA: [
-            { word: 'Father', emoji: '👨' },
-            { word: 'Mother', emoji: '👩' },
-            { word: 'Brother', emoji: '👦' },
-            { word: 'Sister', emoji: '👧' }
+        dataB: {
+          bank: ['do', 'were'], // Distractores
+          sentences: [
+            { text: 'I ___ 8 hours last night.', answer: 'slept' },
+            { text: 'She ___ a letter to her friend.', answer: 'wrote' },
+            { text: 'We ___ soda at the party.', answer: 'drank' },
+            { text: 'He ___ for the math exam.', answer: 'studied' },
+            { text: 'They ___ to the park.', answer: 'ran' },
+            { text: 'I ___ have time to play.', answer: "didn't" }
           ]
         }
-      ],
-      game: {
-        type: 'hangman',
-        words: ['STUDENT', 'TEACHER', 'SCHOOL', 'ENGLISH', 'COEDUCA']
+      },
+      
+      // 4. MULTIPLECHOICE: Uso de did/didn't
+      {
+        type: 'multiplechoice',
+        title: '4. Questions and Negatives',
+        instruction: "Choose the correct option using did or didn't.",
+        dataA: [
+          { q: '___ you go to the party?', options: ['Did', 'Do', 'Are'], answer: 0 },
+          { q: 'She ___ like the food.', options: ["doesn't", "didn't", "don't"], answer: 1 },
+          { q: 'What ___ they play?', options: ['do', 'did', 'are'], answer: 1 },
+          { q: 'I ___ watch TV yesterday.', options: ["didn't", "wasn't", 'not'], answer: 0 }
+        ],
+        dataB: [
+          { q: 'Where ___ he study?', options: ['does', 'is', 'did'], answer: 2 },
+          { q: 'We ___ see the teacher.', options: ["didn't", "aren't", "don't"], answer: 0 },
+          { q: '___ she buy a new car?', options: ['Is', 'Did', 'Does'], answer: 1 },
+          { q: 'They ___ eat anything.', options: ['not', "don't", "didn't"], answer: 2 }
+        ]
+      },
+      
+      // 5. AUDIO (MULTIPLECHOICE): Identificar verbos
+      {
+        type: 'multiplechoice',
+        title: '5. Listening: Past Tense Verbs',
+        instruction: 'Listen to the audio and select the correct verb for each number.',
+        audio: 'files/audio.mp3',
+        dataA: [
+          { q: 'Number 1', options: ['play', 'played', 'playing'], answer: 1 },
+          { q: 'Number 2', options: ['watches', 'watch', 'watched'], answer: 2 },
+          { q: 'Number 3', options: ['studied', 'study', 'studies'], answer: 0 },
+          { q: 'Number 4', options: ['fly', 'flew', 'flown'], answer: 1 },
+          { q: 'Number 5', options: ['write', 'written', 'wrote'], answer: 2 }
+        ],
+        dataB: [
+          { q: 'Number 1', options: ['played', 'plays', 'play'], answer: 0 },
+          { q: 'Number 2', options: ['watch', 'watched', 'watching'], answer: 1 },
+          { q: 'Number 3', options: ['study', 'studying', 'studied'], answer: 2 },
+          { q: 'Number 4', options: ['flown', 'flew', 'flies'], answer: 1 },
+          { q: 'Number 5', options: ['wrote', 'write', 'writing'], answer: 0 }
+        ]
+      },
+      
+      // 6. EMOJIPHRASE: Describir los emojis en pasado
+      {
+        type: 'emojiphrase',
+        title: '6. Emoji Sentences',
+        instruction: 'Write a sentence in the Simple Past that describes the emojis.',
+        dataA: [
+          { emojis: '🍕😋', accept: ['ate', 'pizza'], example: 'I ate pizza' },
+          { emojis: '⚽🏃', accept: ['played', 'soccer', 'football'], example: 'He played soccer' }
+        ],
+        dataB: [
+          { emojis: '🎬🍿', accept: ['watched', 'movie', 'film', 'cinema'], example: 'We watched a movie' },
+          { emojis: '📖😴', accept: ['read', 'book'], example: 'She read a book' }
+        ]
+      },
+      
+      // 7. MATCHLINES: Unir presente con su pasado
+      {
+        type: 'matchlines',
+        title: '7. Present to Past',
+        instruction: 'Match the verb in the present with its past tense form.',
+        dataA: [
+          { left: 'Go', right: 'Went' },
+          { left: 'See', right: 'Saw' },
+          { left: 'Eat', right: 'Ate' },
+          { left: 'Buy', right: 'Bought' }
+        ],
+        dataB: [
+          { left: 'Run', right: 'Ran' },
+          { left: 'Sleep', right: 'Slept' },
+          { left: 'Write', right: 'Wrote' },
+          { left: 'Drink', right: 'Drank' }
+        ]
+      },
+      
+      // 8. REORDER_SENTENCES: Ordenar las palabras
+      {
+        type: 'reorder_sentences',
+        title: '8. Unscramble the sentences',
+        instruction: 'Drag the words to form correct past tense sentences.',
+        dataA: [
+          { words: ['I', 'went', 'to', 'the', 'park'], es: 'Yo fui al parque' },
+          { words: ['Did', 'you', 'see', 'the', 'movie?'], es: '¿Viste la película?' }
+        ],
+        dataB: [
+          { words: ['She', "didn't", 'eat', 'pizza'], es: 'Ella no comió pizza' },
+          { words: ['Where', 'did', 'they', 'go?'], es: '¿A dónde fueron ellos?' }
+        ]
       }
-    });
-  </script>
-
+    ],
+    
+    // JUEGO FINAL
+    game: {
+      type: 'hangman',
+      words: ['MANZANA', 'ARBOL', 'MARIPOSA', 'ESCUELA', 'PROFESOR', 'INGLES', 'ENGLISH', 'RIGO', 'DEMERITO', 'RESPETO', 'SALUD', 'RECREO', 'COEDUCA', 'CAMALEON', 'APRENDER', 'DIVERSION']
+    }
+  });
+</script>
 </body>
 </html>
